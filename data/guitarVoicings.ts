@@ -2,6 +2,8 @@ export type GuitarVoicing = {
   name: string;
   frets: string;
   fingering?: string;
+  rootHint?: string;
+  guideToneHint?: string;
   note: string;
   difficulty: "쉬움" | "중간" | "어려움";
 };

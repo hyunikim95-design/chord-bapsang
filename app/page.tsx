@@ -256,6 +256,7 @@ type FavoriteProgressionItem = {
   createdAt: number;
 };
 type TrainingMode = "chords" | "solo";
+type ViewMode = "minimal" | "normal" | "study";
 type RecentPracticeSession = {
   id: string;
   title: string;
@@ -272,6 +273,11 @@ const favoriteProgressionsStorageKey =
   "chord-bapsang-favorite-progressions-v1";
 const recentPracticeSessionsStorageKey =
   "chord-bapsang-recent-practice-sessions-v1";
+const viewModeLabels: Record<ViewMode, string> = {
+  minimal: "Minimal",
+  normal: "Normal",
+  study: "Study",
+};
 
 type ProgressionAnalysis = ReturnType<typeof analyzeProgression>;
 type PracticeItem = ProgressionAnalysis["items"][number];
@@ -637,6 +643,7 @@ export default function Home() {
 
   const [practiceMode, setPracticeMode] = useState(true);
   const [trainingMode, setTrainingMode] = useState<TrainingMode>("chords");
+  const [viewMode, setViewMode] = useState<ViewMode>("minimal");
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const [bpm, setBpm] = useState(80);
@@ -1279,31 +1286,34 @@ useEffect(() => {
 ]);
 
   return (
-    <main className="min-h-screen bg-[#03050a] text-slate-100">
-      <div className="fixed inset-0 -z-10 bg-[linear-gradient(145deg,_#03050a,_#07101c_52%,_#02040a)]" />
+    <main className="min-h-screen bg-[#02040A] text-[#E5E7EB]">
+      <div className="fixed inset-0 -z-10 bg-[linear-gradient(145deg,_#02040A,_#030712_46%,_#081426)]" />
 
       <section className="mx-auto max-w-6xl space-y-5 px-4 py-5 md:px-6">
-        <header className="border-b border-blue-200/10 pb-4">
+        <header className="border-b border-blue-900/30 pb-4">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.24em] text-[#8fb3d9]">
-                Harmony Training Dashboard
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-[#64748B]">
+                Deep Blue Studio
               </p>
               <h1 className="mt-1 text-3xl font-black tracking-tight md:text-4xl">
                 코드밥상
               </h1>
-              <p className="mt-1 max-w-xl text-sm text-slate-400">
-                진행을 만들고 바로 연습하는 어두운 화성학 워크스페이스.
+              <p className="mt-1 max-w-xl text-sm text-[#94A3B8]">
+                기타 연습, 화성학 분석, 진행 생성을 분리한 다크 뮤직 워크스테이션.
               </p>
             </div>
 
-            <div className="rounded-lg border border-blue-200/10 bg-blue-100/5 px-4 py-3">
-              <p className="text-xs font-bold uppercase text-[#8fb3d9]">
-                Current
-              </p>
-              <p className="mt-1 text-xl font-black">
-                {practiceMode ? "Practice" : "Analyze"}
-              </p>
+            <div className="flex flex-col items-start gap-3 md:items-end">
+              <div className="rounded-lg border border-blue-900/30 bg-[#050B16] px-4 py-3">
+                <p className="text-xs font-bold uppercase text-[#64748B]">
+                  Current
+                </p>
+                <p className="mt-1 text-xl font-black text-[#E5E7EB]">
+                  {practiceMode ? "Practice Console" : "Theory Lab"}
+                </p>
+              </div>
+              <ViewModeTabs viewMode={viewMode} onChange={setViewMode} />
             </div>
           </div>
         </header>
@@ -1311,26 +1321,26 @@ useEffect(() => {
         <Panel>
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <SectionTitle
-              eyebrow="Practice First"
-              title="연습모드"
-              description="진행을 고르고 바로 넘기면서 연습. 자세한 분석은 아래에서 확인."
+              eyebrow="Practice Console"
+              title="연습 콘솔"
+              description="기타 들고 보는 최소 정보 중심 화면. 긴 화성학 설명은 아래 Theory Lab에서 확인."
             />
 
             <button
               onClick={() => setPracticeModeEnabled(!practiceMode)}
-              className="rounded-lg border border-blue-200/10 bg-[#5f88b6] px-5 py-3 text-sm font-black text-white shadow-lg shadow-black/20 transition hover:bg-[#739bc6]"
+              className="rounded-lg border border-blue-900/30 bg-[#1E40AF] px-5 py-3 text-sm font-black text-white shadow-lg shadow-black/20 transition hover:bg-[#2563EB]"
             >
               {practiceMode ? "연습모드 끄기" : "연습모드 켜기"}
             </button>
           </div>
 
-          <div className="mt-4 inline-grid rounded-lg border border-blue-200/10 bg-black/25 p-1 sm:grid-cols-2">
+          <div className="mt-4 inline-grid rounded-lg border border-blue-900/30 bg-black/25 p-1 sm:grid-cols-2">
             <button
               onClick={() => updateTrainingMode("chords")}
               className={`rounded-md px-4 py-2 text-sm font-black transition ${
                 trainingMode === "chords"
-                  ? "bg-[#5f88b6] text-white"
-                  : "text-slate-400 hover:text-blue-100"
+                  ? "bg-[#1E40AF] text-white"
+                  : "text-slate-400 hover:text-[#CBD5E1]"
               }`}
             >
               코드 진행
@@ -1339,8 +1349,8 @@ useEffect(() => {
               onClick={() => updateTrainingMode("solo")}
               className={`rounded-md px-4 py-2 text-sm font-black transition ${
                 trainingMode === "solo"
-                  ? "bg-[#5f88b6] text-white"
-                  : "text-slate-400 hover:text-blue-100"
+                  ? "bg-[#1E40AF] text-white"
+                  : "text-slate-400 hover:text-[#CBD5E1]"
               }`}
             >
               즉흥 솔로
@@ -1352,14 +1362,18 @@ useEffect(() => {
               currentPracticeItem={currentPracticeItem}
               nextPracticeItem={nextPracticeItem}
               trainingMode={trainingMode}
+              viewMode={viewMode}
               currentIndex={currentIndex}
               totalCount={progressionAnalysis.items.length}
               selectedKey={progressionAnalysis.selectedKey}
               selectedKeyRoot={selectedKeyRoot}
               soloScaleNotes={currentSoloScale}
               beatInChord={beatInChord}
+              safeBpm={safeBpm}
               safeBeatsPerChord={safeBeatsPerChord}
               isAutoPlaying={isAutoPlaying}
+              metronomeEnabled={metronomeEnabled}
+              countInEnabled={countInEnabled}
               countInRemaining={countInRemaining}
               currentVoicings={currentVoicings}
               nextVoicings={nextVoicings}
@@ -1375,8 +1389,8 @@ useEffect(() => {
           )}
 
           <div className="mt-4 grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
-            <section className="rounded-lg border border-blue-200/10 bg-black/20 p-4">
-              <p className="text-xs font-black uppercase text-blue-200/80">
+            <section className="rounded-lg border border-blue-900/30 bg-black/20 p-4">
+              <p className="text-xs font-black uppercase text-[#64748B]">
                 Daily Loop
               </p>
               <h3 className="mt-1 text-lg font-black text-white">
@@ -1385,19 +1399,19 @@ useEffect(() => {
               <p className="mt-1 text-sm font-bold text-slate-300">
                 {dailyPracticePreset.title}
               </p>
-              <p className="mt-2 font-mono text-sm font-black text-blue-100/90">
+              <p className="mt-2 font-mono text-sm font-black text-[#CBD5E1]/90">
                 {dailyPracticePreset.progression}
               </p>
               <button
                 onClick={applyDailyPracticePreset}
-                className="mt-3 rounded-lg bg-[#5f88b6] px-4 py-2 text-sm font-black text-white transition hover:bg-[#739bc6]"
+                className="mt-3 rounded-lg bg-[#1E40AF] px-4 py-2 text-sm font-black text-white transition hover:bg-[#2563EB]"
               >
                 오늘 루프 연습
               </button>
             </section>
 
-            <section className="rounded-lg border border-blue-200/10 bg-black/20 p-4">
-              <p className="text-xs font-black uppercase text-blue-200/80">
+            <section className="rounded-lg border border-blue-900/30 bg-black/20 p-4">
+              <p className="text-xs font-black uppercase text-[#64748B]">
                 Resume
               </p>
               <h3 className="mt-1 text-lg font-black text-white">
@@ -1409,7 +1423,7 @@ useEffect(() => {
                     <button
                       key={session.id}
                       onClick={() => applyRecentPracticeSession(session)}
-                      className="rounded-lg border border-blue-200/10 bg-[#070b12] p-3 text-left transition hover:border-blue-200/30"
+                      className="rounded-lg border border-blue-900/30 bg-[#07111F] p-3 text-left transition hover:border-blue-900/40"
                     >
                       <p className="text-sm font-black text-slate-100">
                         {session.trainingMode === "solo" ? "솔로" : "코드"} /{" "}
@@ -1438,7 +1452,7 @@ useEffect(() => {
                 value={progressionInput}
                 onChange={(e) => updateProgressionInput(e.target.value)}
                 placeholder="A - F#m - D - E"
-                className="mt-2 w-full rounded-lg border border-blue-200/10 bg-[#050910] px-4 py-4 text-xl font-bold outline-none transition focus:border-[#8fb3d9]"
+                className="mt-2 w-full rounded-lg border border-blue-900/30 bg-[#050B16] px-4 py-4 text-xl font-bold outline-none transition focus:border-[#64748B]"
               />
             </div>
 
@@ -1449,7 +1463,7 @@ useEffect(() => {
               <select
                 value={analysisKey}
                 onChange={(e) => updateAnalysisKey(e.target.value)}
-                className="mt-2 w-full rounded-lg border border-blue-200/10 bg-[#050910] px-4 py-4 text-xl font-bold outline-none transition focus:border-[#8fb3d9]"
+                className="mt-2 w-full rounded-lg border border-blue-900/30 bg-[#050B16] px-4 py-4 text-xl font-bold outline-none transition focus:border-[#64748B]"
               >
                 <option value="auto">자동 추정</option>
                 {majorKeys.map((key) => (
@@ -1485,7 +1499,7 @@ useEffect(() => {
               <select
                 value={voicingMode}
                 onChange={(e) => setVoicingMode(e.target.value as VoicingMode)}
-                className="mt-2 w-full rounded-lg border border-blue-200/10 bg-[#050910] px-4 py-3 text-lg font-black outline-none transition focus:border-[#8fb3d9]"
+                className="mt-2 w-full rounded-lg border border-blue-900/30 bg-[#050B16] px-4 py-3 text-lg font-black outline-none transition focus:border-[#64748B]"
               >
                 <option value="all">전체</option>
                 <option value="easy">쉬운 보이싱</option>
@@ -1498,7 +1512,7 @@ useEffect(() => {
 
             <button
               onClick={toggleAutoPlay}
-              className="mt-7 rounded-lg bg-[#5f88b6] px-4 py-3 text-base font-black text-white shadow-lg shadow-black/20 transition hover:bg-[#739bc6] md:mt-7"
+              className="mt-7 rounded-lg bg-[#1E40AF] px-4 py-3 text-base font-black text-white shadow-lg shadow-black/20 transition hover:bg-[#2563EB] md:mt-7"
             >
               {isAutoPlaying || countInRemaining !== null
                 ? "일시정지"
@@ -1518,11 +1532,19 @@ useEffect(() => {
               onClick={() => setCountInEnabled((prev) => !prev)}
             />
           </div>
+        </Panel>
 
-          <section className="mt-5 rounded-lg border border-blue-200/10 bg-black/20 p-4">
+        <Panel>
+          <SectionTitle
+            eyebrow="Idea Generator"
+            title="진행 생성과 저장"
+            description="랜덤 진행, Practice Brief, 최근 기록, 즐겨찾기, 프리셋을 한 곳에서 관리."
+          />
+
+          <section className="mt-5 rounded-lg border border-blue-900/30 bg-black/20 p-4">
             <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-300">
+                <p className="text-xs font-black uppercase tracking-[0.28em] text-[#64748B]">
                   Random Progression Generator
                 </p>
                 <h3 className="mt-1 text-2xl font-black">랜덤 진행 생성기</h3>
@@ -1544,7 +1566,7 @@ useEffect(() => {
                 <select
                   value={randomKey}
                   onChange={(e) => setRandomKey(e.target.value)}
-                  className="mt-2 w-full rounded-lg border border-blue-200/10 bg-[#050910] px-4 py-3 text-lg font-black outline-none transition focus:border-[#8fb3d9]"
+                  className="mt-2 w-full rounded-lg border border-blue-900/30 bg-[#050B16] px-4 py-3 text-lg font-black outline-none transition focus:border-[#64748B]"
                 >
                   {majorKeys.map((key) => (
                     <option key={key} value={key}>
@@ -1563,7 +1585,7 @@ useEffect(() => {
                   onChange={(e) =>
                     setRandomFlavor(e.target.value as RandomFlavor)
                   }
-                  className="mt-2 w-full rounded-lg border border-blue-200/10 bg-[#050910] px-4 py-3 text-lg font-black outline-none transition focus:border-[#8fb3d9]"
+                  className="mt-2 w-full rounded-lg border border-blue-900/30 bg-[#050B16] px-4 py-3 text-lg font-black outline-none transition focus:border-[#64748B]"
                 >
                   {Object.entries(randomFlavorLabels).map(([value, label]) => (
                     <option key={value} value={value}>
@@ -1580,7 +1602,7 @@ useEffect(() => {
                 <select
                   value={randomLength}
                   onChange={(e) => setRandomLength(Number(e.target.value))}
-                  className="mt-2 w-full rounded-lg border border-blue-200/10 bg-[#050910] px-4 py-3 text-lg font-black outline-none transition focus:border-[#8fb3d9]"
+                  className="mt-2 w-full rounded-lg border border-blue-900/30 bg-[#050B16] px-4 py-3 text-lg font-black outline-none transition focus:border-[#64748B]"
                 >
                   <option value={3}>3개</option>
                   <option value={4}>4개</option>
@@ -1592,7 +1614,7 @@ useEffect(() => {
               <div className="flex items-end">
                 <button
                   onClick={generateRandomProgression}
-                  className="w-full rounded-lg bg-[#5f88b6] px-4 py-3 text-lg font-black text-white shadow-lg shadow-black/20 transition hover:bg-[#739bc6]"
+                  className="w-full rounded-lg bg-[#1E40AF] px-4 py-3 text-lg font-black text-white shadow-lg shadow-black/20 transition hover:bg-[#2563EB]"
                 >
                   랜덤 생성
                 </button>
@@ -1601,8 +1623,8 @@ useEffect(() => {
 
                         {lastRandomProgression && (
               <div className="mt-4">
-                <div className="rounded-lg border border-sky-300/15 bg-slate-950/60 p-4">
-                  <p className="text-sm font-black uppercase tracking-[0.22em] text-cyan-300">
+                <div className="rounded-lg border border-blue-900/30 bg-[#0A1220] p-4">
+                  <p className="text-sm font-black uppercase tracking-[0.22em] text-[#64748B]">
                     Last Generated
                   </p>
                   <p className="mt-2 font-mono text-xl font-black text-white">
@@ -1614,10 +1636,10 @@ useEffect(() => {
                   </p>
 
                   <div className="mt-4 flex flex-wrap gap-2">
-  <span className="rounded-full bg-cyan-300 px-3 py-1 text-xs font-black text-slate-950">
+  <span className="rounded-full bg-[#1D4ED8] px-3 py-1 text-xs font-black text-slate-950">
     {voicingModeLabels[voicingMode]}
   </span>
-  <span className="rounded-full border border-sky-400/30 px-3 py-1 text-xs font-bold text-slate-300">
+  <span className="rounded-full border border-blue-900/30 px-3 py-1 text-xs font-bold text-slate-300">
     연습모드 ON
   </span>
 
@@ -1629,7 +1651,7 @@ useEffect(() => {
       value={favoriteTitleInput}
       onChange={(e) => setFavoriteTitleInput(e.target.value)}
       placeholder="예: 아련한 IV-iv 루프"
-      className="mt-2 w-full rounded-lg border border-sky-300/15 bg-[#070d18] px-4 py-3 text-base font-bold outline-none transition focus:border-sky-300"
+      className="mt-2 w-full rounded-lg border border-blue-900/30 bg-[#050B16] px-4 py-3 text-base font-bold outline-none transition focus:border-[#1D4ED8]"
     />
   </div>
 
@@ -1646,8 +1668,8 @@ useEffect(() => {
     }
     className={`rounded-lg px-3 py-2 text-xs font-black transition ${
       lastRandomIsFavorite
-        ? "bg-cyan-300 text-slate-950"
-        : "border border-sky-300/40 text-sky-200 hover:bg-sky-300 hover:text-slate-950"
+        ? "bg-[#1D4ED8] text-slate-950"
+        : "border border-blue-900/40 text-[#CBD5E1] hover:bg-[#2563EB] hover:text-white"
     }`}
   >
     {lastRandomIsFavorite ? "즐겨찾기 저장됨" : "즐겨찾기 저장"}
@@ -1656,11 +1678,36 @@ useEffect(() => {
                 </div>
               </div>
             )}
+            {lastRandomProgression && (
+              <section className="mt-4 rounded-lg border border-blue-900/30 bg-[#0A1220] p-4">
+                <p className="text-xs font-black uppercase text-[#64748B]">
+                  Practice Brief
+                </p>
+                <div className="mt-3 grid gap-4 md:grid-cols-2">
+                  <BriefItem
+                    title="핵심"
+                    value={randomFlavorBriefs[randomFlavor].focus}
+                  />
+                  <BriefItem
+                    title="긴장/해결"
+                    value={randomFlavorBriefs[randomFlavor].tension}
+                  />
+                  <BriefItem
+                    title="기타 팁"
+                    value={randomFlavorBriefs[randomFlavor].guitarTip}
+                  />
+                  <BriefItem
+                    title="듣는 포인트"
+                    value={randomFlavorBriefs[randomFlavor].listeningPoint}
+                  />
+                </div>
+              </section>
+            )}
                         {generatedHistory.length > 0 && (
-              <div className="mt-4 rounded-2xl border border-sky-400/20 bg-slate-900/70 p-4">
+              <div className="mt-4 rounded-2xl border border-blue-900/30 bg-[#0B1730] p-4">
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <p className="text-sm font-black uppercase tracking-[0.22em] text-cyan-300">
+                    <p className="text-sm font-black uppercase tracking-[0.22em] text-[#64748B]">
                       Recent Generated
                     </p>
                     <h4 className="mt-1 text-xl font-black text-white">
@@ -1670,7 +1717,7 @@ useEffect(() => {
 
                   <button
                     onClick={() => setGeneratedHistory([])}
-                    className="rounded-full border border-sky-400/30 px-4 py-2 text-sm font-black text-slate-300 transition hover:border-cyan-300 hover:text-cyan-200"
+                    className="rounded-full border border-blue-900/30 px-4 py-2 text-sm font-black text-slate-300 transition hover:border-blue-700 hover:text-[#CBD5E1]"
                   >
                     기록 비우기
                   </button>
@@ -1681,26 +1728,26 @@ useEffect(() => {
                     <button
                       key={item.id}
                       onClick={() => applyGeneratedHistoryItem(item)}
-                      className="rounded-2xl border border-sky-400/20 bg-slate-950/80 p-4 text-left transition hover:border-cyan-300 hover:bg-cyan-300/10"
+                      className="rounded-2xl border border-blue-900/30 bg-[#050B16] p-4 text-left transition hover:border-blue-700 hover:bg-[#1D4ED8]/10"
                     >
-                      <p className="font-mono text-lg font-black text-cyan-100">
+                      <p className="font-mono text-lg font-black text-[#CBD5E1]">
                         {item.progression}
                       </p>
 
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <span className="rounded-full bg-cyan-300 px-2 py-1 text-xs font-black text-slate-950">
+                        <span className="rounded-full bg-[#1D4ED8] px-2 py-1 text-xs font-black text-slate-950">
                           {item.key} major
                         </span>
 
-                        <span className="rounded-full border border-sky-400/30 px-2 py-1 text-xs font-bold text-slate-300">
+                        <span className="rounded-full border border-blue-900/30 px-2 py-1 text-xs font-bold text-slate-300">
                           {randomFlavorLabels[item.flavor]}
                         </span>
 
-                        <span className="rounded-full border border-sky-400/30 px-2 py-1 text-xs font-bold text-slate-300">
+                        <span className="rounded-full border border-blue-900/30 px-2 py-1 text-xs font-bold text-slate-300">
                           {item.length}코드
                         </span>
 
-                        <span className="rounded-full border border-sky-400/30 px-2 py-1 text-xs font-bold text-slate-300">
+                        <span className="rounded-full border border-blue-900/30 px-2 py-1 text-xs font-bold text-slate-300">
                           {voicingModeLabels[item.voicingMode]}
                         </span>
                       </div>
@@ -1714,10 +1761,10 @@ useEffect(() => {
               </div>
             )}
                         {favoriteProgressions.length > 0 && (
-              <div className="mt-4 rounded-2xl border border-cyan-300/30 bg-cyan-300/10 p-4">
+              <div className="mt-4 rounded-2xl border border-blue-900/30 bg-[#1D4ED8]/10 p-4">
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <p className="text-sm font-black uppercase tracking-[0.22em] text-cyan-300">
+                    <p className="text-sm font-black uppercase tracking-[0.22em] text-[#64748B]">
                       Favorites
                     </p>
                     <h4 className="mt-1 text-xl font-black text-white">
@@ -1734,31 +1781,31 @@ useEffect(() => {
                   {favoriteProgressions.map((item) => (
                     <div
                       key={item.id}
-                      className="rounded-2xl border border-cyan-300/20 bg-slate-950/80 p-4"
+                      className="rounded-2xl border border-blue-900/30 bg-[#050B16] p-4"
                     >
                       <div>
   <p className="text-lg font-black text-white">
     {getFavoriteDisplayTitle(item)}
   </p>
-  <p className="mt-1 font-mono text-sm font-black text-cyan-100">
+  <p className="mt-1 font-mono text-sm font-black text-[#CBD5E1]">
     {item.progression}
   </p>
 </div>
 
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <span className="rounded-full bg-cyan-300 px-2 py-1 text-xs font-black text-slate-950">
+                        <span className="rounded-full bg-[#1D4ED8] px-2 py-1 text-xs font-black text-slate-950">
                           {item.key} major
                         </span>
 
-                        <span className="rounded-full border border-sky-400/30 px-2 py-1 text-xs font-bold text-slate-300">
+                        <span className="rounded-full border border-blue-900/30 px-2 py-1 text-xs font-bold text-slate-300">
                           {randomFlavorLabels[item.flavor]}
                         </span>
 
-                        <span className="rounded-full border border-sky-400/30 px-2 py-1 text-xs font-bold text-slate-300">
+                        <span className="rounded-full border border-blue-900/30 px-2 py-1 text-xs font-bold text-slate-300">
                           {item.length}코드
                         </span>
 
-                        <span className="rounded-full border border-sky-400/30 px-2 py-1 text-xs font-bold text-slate-300">
+                        <span className="rounded-full border border-blue-900/30 px-2 py-1 text-xs font-bold text-slate-300">
                           {voicingModeLabels[item.voicingMode]}
                         </span>
                       </div>
@@ -1773,14 +1820,14 @@ useEffect(() => {
       onChange={(e) => updateFavoriteProgressionTitle(item.id, e.target.value)}
       onBlur={() => finishEditingFavoriteProgressionTitle(item.id)}
       placeholder="예: 아련한 IV-iv 루프"
-      className="mt-2 w-full rounded-2xl border border-sky-400/20 bg-slate-950/80 px-4 py-3 text-base font-bold outline-none transition focus:border-cyan-300"
+      className="mt-2 w-full rounded-2xl border border-blue-900/30 bg-[#050B16] px-4 py-3 text-base font-bold outline-none transition focus:border-[#1D4ED8]"
     />
   </div>
 
   <div className="flex flex-wrap gap-2">
     <button
       onClick={() => applyFavoriteProgressionItem(item)}
-      className="rounded-full bg-cyan-300 px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-cyan-200"
+      className="rounded-full bg-[#1D4ED8] px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-[#2563EB]"
     >
       연습하기
     </button>
@@ -1800,10 +1847,10 @@ useEffect(() => {
             )}
             
           </section>
-          <section className="mt-5 rounded-3xl border border-sky-400/20 bg-slate-950/70 p-5">
+          <section className="mt-5 rounded-3xl border border-blue-900/30 bg-[#0A1220] p-5">
             <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-300">
+                <p className="text-xs font-black uppercase tracking-[0.28em] text-[#64748B]">
                   
                   Practice Presets
                 </p>
@@ -1828,8 +1875,8 @@ useEffect(() => {
                     onClick={() => setSelectedPresetCategory(category)}
                     className={`rounded-full px-4 py-2 text-sm font-black transition ${
                       isActive
-                        ? "bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-950"
-                        : "border border-sky-400/20 bg-slate-900/80 text-slate-300 hover:border-cyan-300 hover:text-cyan-200"
+                        ? "bg-[#1D4ED8] text-slate-950 shadow-lg shadow-black/30"
+                        : "border border-blue-900/30 bg-[#0B1730] text-slate-300 hover:border-blue-700 hover:text-[#CBD5E1]"
                     }`}
                   >
                     {getPresetCategoryLabel(category)}
@@ -1843,9 +1890,9 @@ useEffect(() => {
                 <button
                   key={preset.id}
                   onClick={() => applyPracticePreset(preset)}
-                  className="group rounded-2xl border border-sky-400/20 bg-slate-900/80 p-4 text-left transition hover:border-cyan-300 hover:bg-cyan-400/10 hover:shadow-lg hover:shadow-cyan-950"
+                  className="group rounded-2xl border border-blue-900/30 bg-[#0B1730] p-4 text-left transition hover:border-blue-700 hover:bg-[#1E40AF]/10 hover:shadow-lg hover:shadow-black/30"
                 >
-                  <p className="text-lg font-black text-cyan-100 group-hover:text-cyan-200">
+                  <p className="text-lg font-black text-[#CBD5E1] group-hover:text-[#CBD5E1]">
                     {preset.title}
                   </p>
                   <p className="mt-1 text-sm font-bold text-slate-400">
@@ -1857,13 +1904,13 @@ useEffect(() => {
                   </p>
 
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="rounded-full bg-cyan-300 px-2 py-1 text-xs font-black text-slate-950">
+                    <span className="rounded-full bg-[#1D4ED8] px-2 py-1 text-xs font-black text-slate-950">
                       {preset.key} major
                     </span>
-                    <span className="rounded-full border border-sky-400/30 px-2 py-1 text-xs font-bold text-slate-300">
+                    <span className="rounded-full border border-blue-900/30 px-2 py-1 text-xs font-bold text-slate-300">
                       {preset.bpm} BPM
                     </span>
-                    <span className="rounded-full border border-sky-400/30 px-2 py-1 text-xs font-bold text-slate-300">
+                    <span className="rounded-full border border-blue-900/30 px-2 py-1 text-xs font-bold text-slate-300">
                       {voicingModeLabels[preset.voicingMode]}
                     </span>
                   </div>
@@ -1882,16 +1929,29 @@ useEffect(() => {
               ))}
             </div>
           </section>
+        </Panel>
+
+        <Panel>
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <SectionTitle
+              eyebrow="Theory Lab"
+              title="진행 분석과 화성학"
+              description="로마숫자, 기능, 구성음, 차용화음과 세컨더리 도미넌트 해석을 표시 모드에 맞춰 확인."
+            />
+            <ViewModeTabs viewMode={viewMode} onChange={setViewMode} />
+          </div>
+
           <div className="mt-5 grid gap-4 md:grid-cols-3">
             <Info title="추정/선택 조성" value={progressionAnalysis.selectedKey} />
             <Info title="코드 진행" value={progressionAnalysis.chordLine || "-"} />
             <Info title="로마숫자" value={progressionAnalysis.romanLine || "-"} />
           </div>
 
-          {analysisKey === "auto" &&
+          {viewMode === "study" &&
+            analysisKey === "auto" &&
             progressionAnalysis.candidateKeys.length > 0 && (
-              <div className="mt-5 rounded-2xl border border-sky-400/20 bg-slate-950/70 p-4">
-                <p className="text-sm font-black uppercase tracking-[0.22em] text-cyan-300">
+              <div className="mt-5 rounded-lg border border-blue-900/30 bg-[#0A1220] p-4">
+                <p className="text-sm font-black uppercase tracking-[0.22em] text-[#64748B]">
                   자동 추정 후보
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -1900,7 +1960,7 @@ useEffect(() => {
                     .map((candidate) => (
                       <span
                         key={candidate.key}
-                        className="rounded-full border border-sky-400/20 bg-slate-900 px-3 py-1 text-sm font-bold text-slate-300"
+                        className="rounded-lg border border-blue-900/30 bg-[#07111F] px-3 py-1 text-sm font-bold text-[#94A3B8]"
                       >
                         {candidate.key} / 매칭 {candidate.matchedCount}개
                       </span>
@@ -1913,57 +1973,42 @@ useEffect(() => {
             {progressionAnalysis.items.map((item) => (
               <article
                 key={`${item.index}-${item.symbol}`}
-                className="rounded-2xl border border-sky-400/20 bg-slate-950/70 p-4 transition hover:border-cyan-300/60"
+                className="rounded-lg border border-blue-900/30 bg-[#0A1220] p-4 transition hover:border-blue-700/60"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-2xl font-black text-cyan-200">
+                  <h3 className="text-2xl font-black text-[#E5E7EB]">
                     {item.symbol}
                   </h3>
                   <Badge>{item.roman}</Badge>
                 </div>
 
-                <p className="mt-2 text-sm font-bold text-sky-300">
+                <p className="mt-2 text-sm font-bold text-[#94A3B8]">
                   {item.functionName}
                 </p>
 
-                <p className="mt-3 leading-6 text-slate-300">
-                  {item.explanation}
-                </p>
+                {viewMode !== "minimal" && (
+                  <p className="mt-3 leading-6 text-[#CBD5E1]">
+                    {item.explanation}
+                  </p>
+                )}
 
-                {item.notes.length > 0 && (
+                {viewMode !== "minimal" && item.notes.length > 0 && (
                   <p className="mt-3 text-sm text-slate-500">
                     구성음: {item.notes.join(", ")}
                   </p>
+                )}
+
+                {viewMode === "study" && (
+                  <div className="mt-3 rounded-lg border border-blue-900/30 bg-[#050B16] p-3 text-sm leading-6 text-[#94A3B8]">
+                    <p>상태: {item.status}</p>
+                    <p>스케일: {currentSoloScale.join(", ") || "-"}</p>
+                    <p>{item.functionDescription}</p>
+                  </div>
                 )}
               </article>
             ))}
           </div>
 
-          {lastRandomProgression && (
-            <section className="mt-5 rounded-lg border border-sky-300/15 bg-slate-950/50 p-4">
-              <p className="text-xs font-black uppercase text-sky-300">
-                Practice Brief
-              </p>
-              <div className="mt-3 grid gap-4 md:grid-cols-2">
-                <BriefItem
-                  title="핵심"
-                  value={randomFlavorBriefs[randomFlavor].focus}
-                />
-                <BriefItem
-                  title="긴장/해결"
-                  value={randomFlavorBriefs[randomFlavor].tension}
-                />
-                <BriefItem
-                  title="기타 팁"
-                  value={randomFlavorBriefs[randomFlavor].guitarTip}
-                />
-                <BriefItem
-                  title="듣는 포인트"
-                  value={randomFlavorBriefs[randomFlavor].listeningPoint}
-                />
-              </div>
-            </section>
-          )}
         </Panel>
 
         <Panel>
@@ -1977,7 +2022,7 @@ useEffect(() => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="A, Am, A7, Amaj7, F#m7b5..."
-            className="mt-5 w-full rounded-lg border border-sky-300/15 bg-[#070d18] px-4 py-4 text-xl font-bold outline-none transition focus:border-sky-300"
+            className="mt-5 w-full rounded-lg border border-blue-900/30 bg-[#050B16] px-4 py-4 text-xl font-bold outline-none transition focus:border-[#1D4ED8]"
           />
 
           <div className="mt-4 flex flex-wrap gap-2">
@@ -1986,7 +2031,7 @@ useEffect(() => {
                 <button
                   key={chord}
                   onClick={() => setInput(chord)}
-                  className="rounded-lg border border-sky-300/15 bg-slate-950/60 px-3 py-2 text-sm font-bold text-slate-300 transition hover:border-sky-300 hover:text-sky-200"
+                  className="rounded-lg border border-blue-900/30 bg-[#0A1220] px-3 py-2 text-sm font-bold text-slate-300 transition hover:border-blue-700 hover:text-[#CBD5E1]"
                 >
                   {chord}
                 </button>
@@ -2010,7 +2055,7 @@ useEffect(() => {
                   <p className="text-sm font-bold uppercase tracking-[0.22em] text-slate-500">
                     Current Chord
                   </p>
-                  <h2 className="text-4xl font-black text-cyan-200">
+                  <h2 className="text-4xl font-black text-[#CBD5E1]">
                     {cleanInput}
                   </h2>
                   <p className="text-slate-400">{chordInfo.name}</p>
@@ -2018,7 +2063,7 @@ useEffect(() => {
 
                 <button
                   onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="rounded-full border border-cyan-300/50 px-4 py-2 text-sm font-bold text-cyan-200 transition hover:bg-cyan-400 hover:text-slate-950"
+                  className="rounded-full border border-blue-900/40 px-4 py-2 text-sm font-bold text-[#CBD5E1] transition hover:bg-[#2563EB] hover:text-slate-950"
                 >
                   {showAdvanced ? "심화 설명 끄기" : "심화 설명 켜기"}
                 </button>
@@ -2044,16 +2089,16 @@ useEffect(() => {
                   {chordInfo.keyRoles.map((role) => (
                     <article
                       key={`${role.key}-${role.roman}`}
-                      className="rounded-2xl border border-sky-400/20 bg-slate-950/70 p-4"
+                      className="rounded-2xl border border-blue-900/30 bg-[#0A1220] p-4"
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <h3 className="text-lg font-black text-cyan-200">
+                        <h3 className="text-lg font-black text-[#CBD5E1]">
                           {role.key}
                         </h3>
                         <Badge>{role.roman}</Badge>
                       </div>
 
-                      <p className="mt-2 text-sm font-bold text-sky-300">
+                      <p className="mt-2 text-sm font-bold text-[#64748B]">
                         {role.functionName}
                       </p>
 
@@ -2085,7 +2130,7 @@ useEffect(() => {
                 {description ? (
                   <div className="mt-4 space-y-5">
                     <div>
-                      <p className="text-sm font-black uppercase tracking-[0.18em] text-cyan-300">
+                      <p className="text-sm font-black uppercase tracking-[0.18em] text-[#64748B]">
                         Basic
                       </p>
                       <p className="mt-1 leading-7">{description.basic}</p>
@@ -2093,7 +2138,7 @@ useEffect(() => {
 
                     {showAdvanced && (
                       <div>
-                        <p className="text-sm font-black uppercase tracking-[0.18em] text-cyan-300">
+                        <p className="text-sm font-black uppercase tracking-[0.18em] text-[#64748B]">
                           Advanced
                         </p>
                         <p className="mt-1 leading-7 text-slate-300">
@@ -2103,14 +2148,14 @@ useEffect(() => {
                     )}
 
                     <div>
-                      <p className="text-sm font-black uppercase tracking-[0.18em] text-cyan-300">
+                      <p className="text-sm font-black uppercase tracking-[0.18em] text-[#64748B]">
                         Mood Tags
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {description.mood.map((mood) => (
                           <span
                             key={mood}
-                            className="rounded-full border border-sky-400/20 bg-slate-950 px-3 py-1 text-sm font-bold"
+                            className="rounded-full border border-blue-900/30 bg-slate-950 px-3 py-1 text-sm font-bold"
                           >
                             {mood}
                           </span>
@@ -2139,9 +2184,9 @@ useEffect(() => {
                     {description.commonProgressions.map((progression) => (
                       <div
                         key={progression}
-                        className="rounded-2xl border border-sky-400/20 bg-slate-950/70 p-4"
+                        className="rounded-2xl border border-blue-900/30 bg-[#0A1220] p-4"
                       >
-                        <p className="text-lg font-black text-cyan-100">
+                        <p className="text-lg font-black text-[#CBD5E1]">
                           {progression}
                         </p>
                       </div>
@@ -2166,9 +2211,9 @@ useEffect(() => {
                 {chordInfo.relatedScales.map((scale) => (
                   <article
                     key={scale.name}
-                    className="rounded-2xl border border-sky-400/20 bg-slate-950/70 p-4"
+                    className="rounded-2xl border border-blue-900/30 bg-[#0A1220] p-4"
                   >
-                    <h3 className="text-lg font-black text-cyan-200">
+                    <h3 className="text-lg font-black text-[#CBD5E1]">
                       {scale.name}
                     </h3>
                     <p className="mt-1 text-slate-300">
@@ -2190,7 +2235,7 @@ useEffect(() => {
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-blue-200/10 bg-[#080d16]/90 p-5 shadow-xl shadow-black/25 backdrop-blur">
+    <section className="rounded-lg border border-blue-900/30 bg-[#07111F]/95 p-5 shadow-xl shadow-black/25 backdrop-blur">
       {children}
     </section>
   );
@@ -2207,11 +2252,13 @@ function SectionTitle({
 }) {
   return (
     <div>
-      <p className="text-xs font-black uppercase text-[#8fb3d9]">
+      <p className="text-xs font-black uppercase text-[#64748B]">
         {eyebrow}
       </p>
-      <h2 className="mt-1 text-2xl font-black tracking-tight">{title}</h2>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+      <h2 className="mt-1 text-2xl font-black tracking-tight text-[#E5E7EB]">
+        {title}
+      </h2>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-[#94A3B8]">
         {description}
       </p>
     </div>
@@ -2220,9 +2267,9 @@ function SectionTitle({
 
 function Info({ title, value }: { title: string; value: string }) {
   return (
-    <div className="rounded-lg border border-blue-200/10 bg-black/25 p-4">
-      <p className="text-sm font-bold text-slate-500">{title}</p>
-      <p className="mt-1 break-words text-lg font-black text-slate-100">
+    <div className="rounded-lg border border-blue-900/30 bg-[#0A1220] p-4">
+      <p className="text-sm font-bold text-[#64748B]">{title}</p>
+      <p className="mt-1 break-words text-lg font-black text-[#E5E7EB]">
         {value || "-"}
       </p>
     </div>
@@ -2231,17 +2278,43 @@ function Info({ title, value }: { title: string; value: string }) {
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-lg border border-blue-200/20 bg-blue-100/5 px-3 py-1 text-sm font-black text-blue-100">
+    <span className="rounded-lg border border-blue-900/30 bg-[#0B1730] px-3 py-1 text-sm font-black text-[#CBD5E1]">
       {children}
     </span>
+  );
+}
+
+function ViewModeTabs({
+  viewMode,
+  onChange,
+}: {
+  viewMode: ViewMode;
+  onChange: (mode: ViewMode) => void;
+}) {
+  return (
+    <div className="inline-grid rounded-lg border border-blue-900/30 bg-[#02040A] p-1 sm:grid-cols-3">
+      {(Object.keys(viewModeLabels) as ViewMode[]).map((mode) => (
+        <button
+          key={mode}
+          onClick={() => onChange(mode)}
+          className={`rounded-md px-3 py-2 text-xs font-black transition ${
+            viewMode === mode
+              ? "bg-[#1D4ED8] text-white"
+              : "text-[#64748B] hover:text-[#E5E7EB]"
+          }`}
+        >
+          {viewModeLabels[mode]}
+        </button>
+      ))}
+    </div>
   );
 }
 
 function BriefItem({ title, value }: { title: string; value: string }) {
   return (
     <div>
-      <p className="text-sm font-black text-blue-100">{title}</p>
-      <p className="mt-1 text-sm leading-6 text-slate-400">{value}</p>
+      <p className="text-sm font-black text-[#E5E7EB]">{title}</p>
+      <p className="mt-1 text-sm leading-6 text-[#94A3B8]">{value}</p>
     </div>
   );
 }
@@ -2273,7 +2346,7 @@ function NumberInput({
             onChange(nextValue);
           }
         }}
-        className="mt-2 w-full rounded-lg border border-blue-200/10 bg-[#050910] px-4 py-3 text-lg font-black outline-none transition focus:border-[#8fb3d9]"
+        className="mt-2 w-full rounded-lg border border-blue-900/30 bg-[#050B16] px-4 py-3 text-lg font-black outline-none transition focus:border-[#1D4ED8]"
       />
     </div>
   );
@@ -2283,14 +2356,18 @@ function PracticePanel({
   currentPracticeItem,
   nextPracticeItem,
   trainingMode,
+  viewMode,
   currentIndex,
   totalCount,
   selectedKey,
   selectedKeyRoot,
   soloScaleNotes,
   beatInChord,
+  safeBpm,
   safeBeatsPerChord,
   isAutoPlaying,
+  metronomeEnabled,
+  countInEnabled,
   countInRemaining,
   currentVoicings,
   nextVoicings,
@@ -2306,14 +2383,18 @@ function PracticePanel({
   currentPracticeItem: PracticeItem;
   nextPracticeItem: PracticeItem | undefined;
   trainingMode: TrainingMode;
+  viewMode: ViewMode;
   currentIndex: number;
   totalCount: number;
   selectedKey: string;
   selectedKeyRoot: string;
   soloScaleNotes: string[];
   beatInChord: number;
+  safeBpm: number;
   safeBeatsPerChord: number;
   isAutoPlaying: boolean;
+  metronomeEnabled: boolean;
+  countInEnabled: boolean;
   countInRemaining: number | null;
   currentVoicings: GuitarVoicing[];
   nextVoicings: GuitarVoicing[];
@@ -2328,26 +2409,26 @@ function PracticePanel({
 }) {
   if (focusMode) {
     return (
-      <section className="mt-5 rounded-lg border border-blue-200/10 bg-[#060b13] p-5 shadow-2xl shadow-black/30">
+      <section className="mt-5 rounded-lg border border-blue-900/30 bg-[#050B16] p-5 shadow-2xl shadow-black/30">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs font-black uppercase text-[#8fb3d9]">
+            <p className="text-xs font-black uppercase text-[#64748B]">
               {trainingMode === "solo" ? "Focus Solo" : "Focus Practice"}
             </p>
             <h2 className="text-6xl font-black tracking-tight text-white md:text-8xl">
               {currentPracticeItem.symbol}
             </h2>
-            <p className="mt-1 text-xl font-black text-blue-100">
-              {currentPracticeItem.roman} / {selectedKey}
+            <p className="mt-1 text-xl font-black text-[#94A3B8]">
+              {selectedKey} / {safeBpm} BPM
             </p>
           </div>
 
-          <div className="rounded-lg border border-blue-200/10 bg-black/25 p-4 text-left md:text-right">
+          <div className="rounded-lg border border-blue-900/30 bg-[#0A1220] p-4 text-left md:text-right">
             <p className="text-sm font-bold text-slate-400">박자</p>
-            <p className="text-4xl font-black text-blue-100">
+            <p className="text-4xl font-black text-[#E5E7EB]">
               {beatInChord} / {safeBeatsPerChord}
             </p>
-            <p className="mt-1 text-sm font-black text-blue-100">
+            <p className="mt-1 text-sm font-black text-[#94A3B8]">
               {countInRemaining !== null
                 ? `카운트인 ${countInRemaining}`
                 : isAutoPlaying
@@ -2362,7 +2443,7 @@ function PracticePanel({
             <div
               key={index}
               className={`h-3 flex-1 rounded-lg transition ${
-                index + 1 <= beatInChord ? "bg-[#8fb3d9]" : "bg-slate-800"
+                index + 1 <= beatInChord ? "bg-[#1D4ED8]" : "bg-[#0B1730]"
               }`}
             />
           ))}
@@ -2383,7 +2464,7 @@ function PracticePanel({
               symbol={currentPracticeItem.symbol}
               voicing={bestVoicingPair.currentVoicing}
             />
-            <div className="text-center text-2xl font-black text-[#8fb3d9]">→</div>
+            <div className="text-center text-2xl font-black text-[#64748B]">→</div>
             <PracticeVoicingCard
               label="다음"
               symbol={nextPracticeItem?.symbol ?? "-"}
@@ -2406,24 +2487,24 @@ function PracticePanel({
   }
 
   return (
-    <section className="mt-5 rounded-lg border border-blue-200/10 bg-[#060b13] p-4 shadow-2xl shadow-black/25">
+    <section className="mt-5 rounded-lg border border-blue-900/30 bg-[#050B16] p-4 shadow-2xl shadow-black/25">
       <div className="grid gap-4 lg:grid-cols-[0.78fr_1.22fr] lg:items-stretch">
-        <div className="rounded-lg border border-blue-200/10 bg-black/25 p-4">
+        <div className="rounded-lg border border-blue-900/30 bg-[#0A1220] p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase text-[#8fb3d9]">
+              <p className="text-xs font-black uppercase text-[#64748B]">
                 {trainingMode === "solo" ? "Solo Practice" : "Now Playing"}
               </p>
               <h2 className="mt-1 text-5xl font-black tracking-tight text-white md:text-6xl">
                 {currentPracticeItem.symbol}
               </h2>
-              <p className="mt-1 text-lg font-black text-blue-100">
-                {currentPracticeItem.roman} / {selectedKey}
+              <p className="mt-1 text-lg font-black text-[#94A3B8]">
+                {selectedKey} / {safeBpm} BPM
               </p>
             </div>
 
             <div className="text-right">
-              <p className="text-sm font-black text-blue-100">
+              <p className="text-sm font-black text-[#94A3B8]">
                 {currentIndex + 1} / {totalCount}
               </p>
               <p className="mt-1 text-sm font-bold text-slate-400">
@@ -2441,26 +2522,37 @@ function PracticePanel({
               <div
                 key={index}
                 className={`h-3 flex-1 rounded-lg transition ${
-                  index + 1 <= beatInChord ? "bg-[#8fb3d9]" : "bg-slate-800"
+                  index + 1 <= beatInChord ? "bg-[#1D4ED8]" : "bg-[#0B1730]"
                 }`}
               />
             ))}
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-            <PracticeMiniCard title="기능" value={currentPracticeItem.functionName} />
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            <PracticeMiniCard title="BPM / 박자" value={`${safeBpm} / ${safeBeatsPerChord}`} />
             <PracticeMiniCard title="다음 코드" value={nextPracticeItem?.symbol ?? "-"} />
             <PracticeMiniCard
               title="모드"
               value={trainingMode === "solo" ? "즉흥 솔로" : voicingModeLabel}
             />
+            <PracticeMiniCard
+              title="클릭"
+              value={`${metronomeEnabled ? "메트로놈 ON" : "메트로놈 OFF"} / ${
+                countInEnabled ? "카운트인 ON" : "카운트인 OFF"
+              }`}
+            />
+            {viewMode !== "minimal" && (
+              <PracticeMiniCard title="기능" value={currentPracticeItem.functionName} />
+            )}
           </div>
 
-          <p className="mt-4 text-sm leading-6 text-slate-400">
-            {trainingMode === "solo"
-              ? `${selectedKeyRoot} major 위에서 현재 코드톤에 착지.`
-              : `현재 ${currentVoicings.length}개, 다음 ${nextVoicings.length}개 보이싱 후보.`}
-          </p>
+          {viewMode !== "minimal" && (
+            <p className="mt-4 text-sm leading-6 text-[#94A3B8]">
+              {trainingMode === "solo"
+                ? `${selectedKeyRoot} major 위에서 현재 코드톤에 착지.`
+                : `현재 ${currentVoicings.length}개, 다음 ${nextVoicings.length}개 보이싱 후보.`}
+            </p>
+          )}
         </div>
 
         {trainingMode === "solo" ? (
@@ -2472,10 +2564,10 @@ function PracticePanel({
             currentIndex={currentIndex}
           />
         ) : bestVoicingPair ? (
-          <section className="rounded-lg border border-blue-200/10 bg-black/25 p-4">
+          <section className="rounded-lg border border-blue-900/30 bg-[#0A1220] p-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="text-xs font-black uppercase text-[#8fb3d9]">
+                <p className="text-xs font-black uppercase text-[#64748B]">
                   Best Move
                 </p>
                 <h3 className="mt-1 text-xl font-black text-white">
@@ -2483,7 +2575,7 @@ function PracticePanel({
                 </h3>
               </div>
 
-              <span className="rounded-lg bg-[#5f88b6] px-3 py-2 text-sm font-black text-white">
+              <span className="rounded-lg bg-[#1E40AF] px-3 py-2 text-sm font-black text-white">
                 {getMovementLabel(bestVoicingPair.distance)}
               </span>
             </div>
@@ -2494,7 +2586,7 @@ function PracticePanel({
                 symbol={currentPracticeItem.symbol}
                 voicing={bestVoicingPair.currentVoicing}
               />
-              <div className="text-center text-2xl font-black text-[#8fb3d9]">→</div>
+              <div className="text-center text-2xl font-black text-[#64748B]">→</div>
               <PracticeVoicingCard
                 label="다음"
                 symbol={nextPracticeItem?.symbol ?? "-"}
@@ -2502,9 +2594,11 @@ function PracticePanel({
               />
             </div>
 
-            <p className="mt-3 text-sm font-bold text-slate-400">
-              이동량 점수: {bestVoicingPair.distance} / 낮을수록 손 이동이 적음
-            </p>
+            {viewMode !== "minimal" && (
+              <p className="mt-3 text-sm font-bold text-[#94A3B8]">
+                이동량 점수: {bestVoicingPair.distance} / 낮을수록 손 이동이 적음
+              </p>
+            )}
           </section>
         ) : null}
       </div>
@@ -2528,7 +2622,7 @@ function PracticePanel({
 
 function PracticeMiniCard({ title, value }: { title: string; value: string }) {
   return (
-    <div className="rounded-lg border border-blue-200/10 bg-[#050910] p-3">
+    <div className="rounded-lg border border-blue-900/30 bg-[#050B16] p-3">
       <p className="text-sm font-bold text-slate-400">{title}</p>
       <p className="mt-1 break-words text-base font-black text-white">
         {value}
@@ -2561,17 +2655,17 @@ function SoloPracticePanel({
     soloConstraintPrompts[currentIndex % soloConstraintPrompts.length];
 
   return (
-    <section className="rounded-lg border border-blue-200/10 bg-black/25 p-4">
+    <section className="rounded-lg border border-blue-900/30 bg-black/25 p-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-xs font-black uppercase text-blue-200/80">
+          <p className="text-xs font-black uppercase text-[#64748B]">
             Solo Map
           </p>
           <h3 className="mt-1 text-xl font-black text-white">
             {selectedKeyRoot} major 즉흥 솔로
           </h3>
         </div>
-        <span className="rounded-lg bg-[#5f88b6] px-3 py-2 text-sm font-black text-white">
+        <span className="rounded-lg bg-[#1E40AF] px-3 py-2 text-sm font-black text-white">
           목표음 {targetNote}
         </span>
       </div>
@@ -2591,13 +2685,13 @@ function SoloPracticePanel({
 
 function SoloInfoBlock({ title, notes }: { title: string; notes: string[] }) {
   return (
-    <div className="rounded-lg border border-blue-200/10 bg-[#070b12] p-3">
+    <div className="rounded-lg border border-blue-900/30 bg-[#07111F] p-3">
       <p className="text-sm font-bold text-slate-400">{title}</p>
       <div className="mt-2 flex flex-wrap gap-2">
         {notes.map((note) => (
           <span
             key={`${title}-${note}`}
-            className="rounded-md border border-blue-200/10 bg-blue-100/5 px-2 py-1 text-sm font-black text-blue-100"
+            className="rounded-md border border-blue-900/30 bg-[#0B1730] px-2 py-1 text-sm font-black text-[#CBD5E1]"
           >
             {note}
           </span>
@@ -2616,21 +2710,28 @@ function PracticeVoicingCard({
   symbol: string;
   voicing: GuitarVoicing;
 }) {
+  const rootHint = voicing.rootHint ?? "루트 위치 미등록";
+  const guideToneHint = voicing.guideToneHint ?? "핵심음 미등록";
+
   return (
-    <div className="rounded-lg border border-blue-200/10 bg-[#050910] p-4">
+    <div className="rounded-lg border border-blue-900/30 bg-[#050B16] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-black uppercase text-[#8fb3d9]">{label}</p>
+          <p className="text-xs font-black uppercase text-[#64748B]">{label}</p>
           <h4 className="mt-1 text-xl font-black text-white">{symbol}</h4>
         </div>
-        <span className="rounded-lg border border-blue-200/10 px-2 py-1 text-xs font-bold text-slate-300">
+        <span className="rounded-lg border border-blue-900/30 px-2 py-1 text-xs font-bold text-[#94A3B8]">
           {voicing.difficulty}
         </span>
       </div>
 
-      <p className="mt-2 text-sm font-bold text-slate-300">{voicing.name}</p>
+      <p className="mt-2 text-sm font-bold text-[#CBD5E1]">{voicing.name}</p>
       <ChordDiagram voicing={voicing} />
-      <p className="mt-2 text-sm leading-6 text-slate-500">{voicing.note}</p>
+      <div className="mt-3 rounded-lg border border-blue-900/30 bg-[#0A1220] p-3 text-sm leading-6">
+        <p className="font-bold text-[#E5E7EB]">루트: {rootHint}</p>
+        <p className="text-[#94A3B8]">핵심음: {guideToneHint}</p>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-[#64748B]">{voicing.note}</p>
     </div>
   );
 }
@@ -2648,10 +2749,10 @@ function ChordDiagram({ voicing }: { voicing: GuitarVoicing }) {
 
   return (
     <div
-      className="mt-3 rounded-lg border border-blue-200/10 bg-black/20 p-3"
+      className="mt-3 rounded-lg border border-blue-900/30 bg-[#02040A] p-3"
       aria-label={`${voicing.name} 기타 코드 다이어그램`}
     >
-      <div className="grid grid-cols-6 text-center text-xs font-black text-slate-500">
+      <div className="grid grid-cols-6 text-center text-xs font-black text-[#64748B]">
         {frets.map((fret, index) => (
           <span key={`${voicing.name}-status-${index}`}>
             {fret === null ? "x" : fret === 0 ? "o" : ""}
@@ -2660,14 +2761,14 @@ function ChordDiagram({ voicing }: { voicing: GuitarVoicing }) {
       </div>
 
       <div className="mt-2 flex gap-3">
-        <div className="w-6 pt-2 text-right text-xs font-bold text-slate-500">
+        <div className="w-6 pt-2 text-right text-xs font-bold text-[#64748B]">
           {baseFret > 1 ? `${baseFret}fr` : ""}
         </div>
         <div className="relative h-36 flex-1">
           {Array.from({ length: 6 }).map((_, index) => (
             <div
               key={`${voicing.name}-string-${index}`}
-              className="absolute top-0 bottom-0 w-px bg-slate-600/70"
+              className="absolute top-0 bottom-0 w-px bg-[#334155]/70"
               style={{ left: `${(index / 5) * 100}%` }}
             />
           ))}
@@ -2677,14 +2778,14 @@ function ChordDiagram({ voicing }: { voicing: GuitarVoicing }) {
               key={`${voicing.name}-fret-${fret}`}
               className={`absolute left-0 right-0 h-px ${
                 index === 0 && baseFret === 1
-                  ? "bg-slate-300"
-                  : "bg-slate-700/80"
+                  ? "bg-[#94A3B8]"
+                  : "bg-[#1E293B]"
               }`}
               style={{ top: `${(index / 5) * 100}%` }}
             />
           ))}
 
-          <div className="absolute left-0 right-0 bottom-0 h-px bg-slate-700/80" />
+          <div className="absolute left-0 right-0 bottom-0 h-px bg-[#1E293B]" />
 
           {frets.map((fret, stringIndex) => {
             if (!fret || fret < baseFret || fret > baseFret + 4) return null;
@@ -2692,7 +2793,7 @@ function ChordDiagram({ voicing }: { voicing: GuitarVoicing }) {
             return (
               <span
                 key={`${voicing.name}-marker-${stringIndex}-${fret}`}
-                className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#8fb3d9] shadow-sm shadow-black/40"
+                className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1D4ED8] shadow-sm shadow-black/40"
                 style={{
                   left: `${(stringIndex / 5) * 100}%`,
                   top: `${((fret - baseFret + 0.5) / 5) * 100}%`,
@@ -2703,7 +2804,7 @@ function ChordDiagram({ voicing }: { voicing: GuitarVoicing }) {
         </div>
       </div>
 
-      <div className="mt-2 grid grid-cols-6 pl-9 text-center text-xs font-bold text-slate-500">
+      <div className="mt-2 grid grid-cols-6 pl-9 text-center text-xs font-bold text-[#64748B]">
         {stringNames.map((stringName, index) => (
           <span key={`${voicing.name}-string-name-${index}`}>{stringName}</span>
         ))}
@@ -2726,7 +2827,7 @@ function TogglePill({
       onClick={onClick}
       className={`rounded-lg border px-3 py-2 text-sm font-black transition ${
         active
-          ? "border-blue-200/20 bg-[#16283c] text-blue-100"
+          ? "border-blue-900/30 bg-[#16283c] text-[#CBD5E1]"
           : "border-slate-700/60 bg-black/20 text-slate-500 hover:text-slate-300"
       }`}
     >
@@ -2761,13 +2862,13 @@ function PracticeControls({
       </ControlButton>
       <button
         onClick={onToggleFocusMode}
-        className="rounded-lg border border-blue-200/20 px-4 py-2 text-sm font-black text-blue-100 transition hover:bg-[#5f88b6] hover:text-white"
+        className="rounded-lg border border-blue-900/30 px-4 py-2 text-sm font-black text-[#CBD5E1] transition hover:bg-[#1E40AF] hover:text-white"
       >
         {focusMode ? "일반모드" : "집중모드"}
       </button>
       <button
         onClick={onClose}
-        className="rounded-lg border border-blue-200/10 px-4 py-2 text-sm font-black text-slate-300 transition hover:border-blue-200/30 hover:text-blue-100"
+        className="rounded-lg border border-blue-900/30 px-4 py-2 text-sm font-black text-slate-300 transition hover:border-blue-900/40 hover:text-[#CBD5E1]"
       >
         종료
       </button>
@@ -2785,7 +2886,7 @@ function ControlButton({
   return (
     <button
       onClick={onClick}
-      className="rounded-lg bg-[#5f88b6] px-4 py-2 text-sm font-black text-white shadow-lg shadow-black/20 transition hover:bg-[#739bc6]"
+      className="rounded-lg bg-[#1E40AF] px-4 py-2 text-sm font-black text-white shadow-lg shadow-black/20 transition hover:bg-[#2563EB]"
     >
       {children}
     </button>
