@@ -6,9 +6,14 @@ import {
   getChordInfo,
   majorKeys,
 } from "../lib/harmony";
+import {
+  getChordQualityKey,
+  getChordTheoryProfile,
+} from "../data/chordTheory";
 import { chordDescriptions } from "../data/chordDescriptions";
 import { getGuitarVoicings, type GuitarVoicing } from "../data/guitarVoicings";
 import { practicePresets, type PracticePreset } from "../data/practicePresets";
+import { getRecommendedScaleProfilesForChord } from "../data/scaleTheory";
 
 type VoicingMode = "all" | "easy" | "open" | "barre" | "upper" | "neo";
 
@@ -263,6 +268,7 @@ type TheorySectionId =
   | "function"
   | "borrowed"
   | "secondary"
+  | "chordTheory"
   | "scales"
   | "voicing"
   | "solo";
@@ -569,6 +575,120 @@ function getMovementLabel(distance: number) {
   if (distance <= 8) return "가까움";
   if (distance <= 14) return "보통";
   return "이동 많음";
+}
+
+function getFocusMovementHint(
+  currentSymbol: string,
+  nextSymbol: string | undefined,
+  pair: VoicingPair | null
+) {
+  if (!pair || !nextSymbol) {
+    return "다음 이동: 루트 위치와 공통음을 확인";
+  }
+
+  const currentFrets = parseFretString(pair.currentVoicing.frets).slice(0, 6);
+  const nextFrets = parseFretString(pair.nextVoicing.frets).slice(0, 6);
+  const stableStrings = currentFrets
+    .map((fret, stringIndex) => {
+      if (fret === null || nextFrets[stringIndex] !== fret) return null;
+      if (fret === 0) return `${getGuitarStringNumber(stringIndex)}번줄 개방현`;
+      return `${getGuitarStringNumber(stringIndex)}번줄 ${fret}프렛`;
+    })
+    .filter((value): value is string => value !== null)
+    .slice(0, 2);
+  const nextRoot = getRootHint(nextSymbol, pair.nextVoicing);
+  const moveLabel = getMovementLabel(pair.distance);
+
+  if (stableStrings.length > 0) {
+    return `다음 이동: ${stableStrings.join(", ")} 유지, 루트는 ${nextRoot} 확인`;
+  }
+
+  return `다음 이동: ${currentSymbol} → ${nextSymbol}, ${moveLabel} 연결. 루트 위치와 공통음을 확인`;
+}
+
+function getResolutionCandidates(nextItem: PracticeItem | undefined) {
+  if (!nextItem || nextItem.notes.length === 0) return [];
+
+  const quality = getChordQualityKey(nextItem.symbol);
+  const root = nextItem.notes[0];
+  const third = nextItem.notes[1];
+
+  if (quality === "dominant7" || quality === "maj7" || quality === "major") {
+    return [third, root].filter(Boolean);
+  }
+
+  if (quality === "m7" || quality === "minor" || quality === "m7b5") {
+    return [third, root].filter(Boolean);
+  }
+
+  return [root, third].filter(Boolean);
+}
+
+function getSoloTargetRecommendation(
+  currentItem: PracticeItem | undefined,
+  nextItem: PracticeItem | undefined,
+  rhythmPrompt: string,
+  constraintPrompt: string
+) {
+  const symbol = currentItem?.symbol ?? "-";
+  const notes = currentItem?.notes ?? [];
+  const quality = getChordQualityKey(symbol);
+  const root = notes[0] ?? getChordRootSymbol(symbol);
+  const third = notes[1] ?? root;
+  const fifth = notes[2] ?? root;
+  const seventh = notes[3];
+  const resolutionCandidates = getResolutionCandidates(nextItem);
+
+  if (quality === "dominant7") {
+    const targetNote = third;
+    return {
+      targetNote,
+      alternateTargets: [third, seventh].filter(Boolean),
+      reason: `${symbol}의 3도라서 도미넌트 긴장이 가장 선명하게 들립니다.`,
+      resolution: resolutionCandidates.join(", ") || "다음 코드의 루트",
+      exercise: `${constraintPrompt}. ${rhythmPrompt}`,
+    };
+  }
+
+  if (quality === "maj7" || quality === "maj9") {
+    const targetNote = third;
+    return {
+      targetNote,
+      alternateTargets: [third, seventh].filter(Boolean),
+      reason: `${symbol}의 3도/7도를 노리면 maj7의 세련된 색이 살아납니다.`,
+      resolution: resolutionCandidates.join(", ") || root,
+      exercise: rhythmPrompt,
+    };
+  }
+
+  if (quality === "m7" || quality === "m9" || quality === "m7b5") {
+    const targetNote = third;
+    return {
+      targetNote,
+      alternateTargets: [third, seventh].filter(Boolean),
+      reason: `${symbol}의 b3/b7을 노리면 마이너 계열 색이 바로 들립니다.`,
+      resolution: resolutionCandidates.join(", ") || root,
+      exercise: `${constraintPrompt}. ${rhythmPrompt}`,
+    };
+  }
+
+  if (quality === "minor") {
+    return {
+      targetNote: third,
+      alternateTargets: [third, root].filter(Boolean),
+      reason: `${symbol}의 b3를 먼저 들으면 마이너 정서가 안정적으로 잡힙니다.`,
+      resolution: resolutionCandidates.join(", ") || root,
+      exercise: rhythmPrompt,
+    };
+  }
+
+  return {
+    targetNote: third,
+    alternateTargets: [third, fifth, root].filter(Boolean),
+    reason: `${symbol}의 3도를 먼저 노리면 코드 성격이 가장 빠르게 들립니다.`,
+    resolution: resolutionCandidates.join(", ") || root,
+    exercise: rhythmPrompt,
+  };
 }
 
 function getMajorScaleNotes(key: string) {
@@ -2544,8 +2664,24 @@ function TheoryAccordion({
   const secondaryItems = progressionAnalysis.items.filter(
     (item) => item.status === "secondaryDominant"
   );
-  const targetNote = nextPracticeItem?.notes[0] ?? currentSoloScale[0] ?? "-";
-  const landingNote = currentPracticeItem?.notes[1] ?? targetNote;
+  const chordTheoryProfile = currentPracticeItem
+    ? getChordTheoryProfile(currentPracticeItem.symbol)
+    : null;
+  const recommendedScales = currentPracticeItem
+    ? getRecommendedScaleProfilesForChord(currentPracticeItem.symbol)
+    : [];
+  const rhythmPrompt = soloRhythmPrompts[
+    (currentPracticeItem?.index ?? 0) % soloRhythmPrompts.length
+  ];
+  const constraintPrompt = soloConstraintPrompts[
+    (currentPracticeItem?.index ?? 0) % soloConstraintPrompts.length
+  ];
+  const soloRecommendation = getSoloTargetRecommendation(
+    currentPracticeItem,
+    nextPracticeItem,
+    rhythmPrompt,
+    constraintPrompt
+  );
   const sections: {
     id: TheorySectionId;
     title: string;
@@ -2645,19 +2781,71 @@ function TheoryAccordion({
         ),
     },
     {
+      id: "chordTheory",
+      title: "코드 타입 / 핵심음",
+      summary: chordTheoryProfile
+        ? `${currentPracticeItem?.symbol ?? "-"} / ${chordTheoryProfile.koreanName}`
+        : "현재 코드 타입 정보 없음",
+      content: chordTheoryProfile ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          <TheoryMiniRow
+            title="코드 타입"
+            value={`${chordTheoryProfile.koreanName} (${chordTheoryProfile.quality})`}
+          />
+          <TheoryMiniRow
+            title="구성 간격"
+            value={chordTheoryProfile.intervals.join(", ")}
+          />
+          <TheoryMiniRow title="무드" value={chordTheoryProfile.mood} />
+          <TheoryMiniRow title="사용처" value={chordTheoryProfile.usage} />
+          {chordTheoryProfile.guideToneRule && (
+            <TheoryMiniRow
+              title="핵심음 규칙"
+              value={chordTheoryProfile.guideToneRule}
+            />
+          )}
+          {chordTheoryProfile.commonProgressionUse && (
+            <TheoryMiniRow
+              title="진행 안에서"
+              value={chordTheoryProfile.commonProgressionUse}
+            />
+          )}
+        </div>
+      ) : (
+        <p className="text-sm leading-6 text-[#94A3B8]">
+          현재 코드에 매칭되는 코드 타입 설명이 아직 없습니다.
+        </p>
+      ),
+    },
+    {
       id: "scales",
       title: "관련 스케일",
-      summary: `${progressionAnalysis.selectedKeyRoot} major`,
+      summary:
+        recommendedScales.length > 0
+          ? recommendedScales.map((scale) => scale.name).join(", ")
+          : `${progressionAnalysis.selectedKeyRoot} major`,
       content: (
-        <div className="flex flex-wrap gap-2">
-          {currentSoloScale.map((note) => (
-            <span
-              key={`scale-${note}`}
-              className="rounded-md border border-blue-900/30 bg-[#0B1730] px-3 py-2 text-sm font-black text-[#CBD5E1]"
-            >
-              {note}
-            </span>
-          ))}
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {currentSoloScale.map((note) => (
+              <span
+                key={`scale-${note}`}
+                className="rounded-md border border-blue-900/30 bg-[#0B1730] px-3 py-2 text-sm font-black text-[#CBD5E1]"
+              >
+                {note}
+              </span>
+            ))}
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            {recommendedScales.map((scale) => (
+              <TheoryMiniRow
+                key={scale.name}
+                title={`${currentPracticeItem?.notes[0] ?? progressionAnalysis.selectedKeyRoot} ${scale.name}`}
+                value={`${scale.koreanName}: ${scale.usage} 타겟 ${scale.targetNotes?.join(", ") ?? "-"}`}
+              />
+            ))}
+          </div>
         </div>
       ),
     },
@@ -2693,12 +2881,18 @@ function TheoryAccordion({
     {
       id: "solo",
       title: "솔로 타겟 노트 해설",
-      summary: `타겟 ${targetNote} / 추천 착지 3도 ${landingNote}`,
+      summary: `타겟 ${soloRecommendation.targetNote} / 해결 ${soloRecommendation.resolution}`,
       content: (
         <div className="grid gap-3 md:grid-cols-3">
           <Info title="현재 코드" value={currentPracticeItem?.symbol ?? "-"} />
-          <Info title="타겟 노트" value={targetNote} />
-          <Info title="추천 착지" value={`3도 ${landingNote}`} />
+          <Info title="타겟 노트" value={soloRecommendation.targetNote} />
+          <Info
+            title="대체 타겟"
+            value={soloRecommendation.alternateTargets.join(", ")}
+          />
+          <Info title="추천 이유" value={soloRecommendation.reason} />
+          <Info title="해결 후보" value={soloRecommendation.resolution} />
+          <Info title="연습 과제" value={soloRecommendation.exercise} />
         </div>
       ),
     },
@@ -2853,6 +3047,12 @@ function PracticePanel({
   onTogglePlay: () => void;
   onClose: () => void;
 }) {
+  const focusMovementHint = getFocusMovementHint(
+    currentPracticeItem.symbol,
+    nextPracticeItem?.symbol,
+    bestVoicingPair
+  );
+
   if (focusMode) {
     return (
       <section className="mt-5 rounded-lg border border-blue-900/30 bg-[#050B16] p-5 shadow-2xl shadow-black/30">
@@ -2923,6 +3123,12 @@ function PracticePanel({
             </div>
           </section>
         ) : null}
+
+        {trainingMode === "chords" && bestVoicingPair && (
+          <p className="mx-auto mt-3 max-w-[760px] rounded-lg border border-blue-900/30 bg-[#0A1220] p-3 text-sm font-black leading-6 text-[#CBD5E1]">
+            {focusMovementHint}
+          </p>
+        )}
 
         <PracticeControls
           isAutoPlaying={isAutoPlaying}
@@ -3101,12 +3307,19 @@ function SoloPracticePanel({
     currentPracticeItem.notes.length > 0
       ? currentPracticeItem.notes
       : soloScaleNotes.slice(0, 4);
-  const targetNote = nextPracticeItem?.notes[0] ?? selectedKeyRoot;
-  const landingNote = chordTones[1] ?? targetNote;
   const rhythmPrompt =
     soloRhythmPrompts[currentIndex % soloRhythmPrompts.length];
   const constraintPrompt =
     soloConstraintPrompts[currentIndex % soloConstraintPrompts.length];
+  const soloRecommendation = getSoloTargetRecommendation(
+    currentPracticeItem,
+    nextPracticeItem,
+    rhythmPrompt,
+    constraintPrompt
+  );
+  const targetNotes = soloRecommendation.alternateTargets.length
+    ? soloRecommendation.alternateTargets
+    : [soloRecommendation.targetNote];
 
   return (
     <section className="rounded-lg border border-blue-900/30 bg-black/25 p-4">
@@ -3120,7 +3333,7 @@ function SoloPracticePanel({
           </h3>
         </div>
         <span className="rounded-lg bg-[#1E40AF] px-3 py-2 text-sm font-black text-white">
-          목표음 {targetNote}
+          목표음 {soloRecommendation.targetNote}
         </span>
       </div>
 
@@ -3131,19 +3344,20 @@ function SoloPracticePanel({
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         <PracticeMiniCard title="현재 코드" value={currentPracticeItem.symbol} />
-        <PracticeMiniCard title="타겟 노트" value={targetNote} />
-        <PracticeMiniCard title="추천 착지" value={`3도 ${landingNote}`} />
+        <PracticeMiniCard title="타겟 노트" value={soloRecommendation.targetNote} />
+        <PracticeMiniCard title="해결 후보" value={soloRecommendation.resolution} />
+        <PracticeMiniCard title="추천 이유" value={soloRecommendation.reason} />
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <PracticeMiniCard title="리듬 제한" value={rhythmPrompt} />
-        <PracticeMiniCard title="프레이즈 제한" value={constraintPrompt} />
+        <PracticeMiniCard title="연습 과제" value={soloRecommendation.exercise} />
       </div>
 
       {compact ? (
         <p className="mt-4 rounded-lg border border-blue-900/30 bg-[#050B16] p-3 text-sm font-bold leading-6 text-[#94A3B8]">
-          Focus mode keeps the full fretboard folded so the target note and
-          landing note stay readable at a glance.
+          집중모드에서는 큰 프렛보드 맵을 접고 타겟 노트와 해결 후보만
+          빠르게 확인합니다.
         </p>
       ) : (
         <FretboardMap
@@ -3151,7 +3365,7 @@ function SoloPracticePanel({
           currentChordSymbol={currentPracticeItem.symbol}
           currentChordNotes={chordTones}
           scaleNotes={soloScaleNotes}
-          targetNotes={[targetNote]}
+          targetNotes={targetNotes}
           mode="solo"
         />
       )}
@@ -3366,7 +3580,7 @@ function PracticeVoicingCard({
   return (
     <div
       className={`rounded-lg border border-blue-900/30 bg-[#050B16] p-4 ${
-        compact ? "mx-auto w-full max-w-[340px]" : ""
+        compact ? "mx-auto w-full max-w-[360px]" : ""
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -3440,7 +3654,9 @@ function ChordDiagram({
 
   return (
     <div
-      className="mt-3 rounded-lg border border-blue-900/30 bg-[#02040A] p-3"
+      className={`mx-auto mt-3 w-full rounded-lg border border-blue-900/30 bg-[#02040A] p-3 ${
+        compact ? "max-w-[320px]" : "max-w-[280px]"
+      }`}
       aria-label={`${voicing.name} 기타 코드 다이어그램`}
     >
       <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-3">
