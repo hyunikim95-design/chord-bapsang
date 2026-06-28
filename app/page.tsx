@@ -257,6 +257,15 @@ type FavoriteProgressionItem = {
 };
 type TrainingMode = "chords" | "solo";
 type ViewMode = "minimal" | "normal" | "study";
+type TheorySectionId =
+  | "summary"
+  | "roman"
+  | "function"
+  | "borrowed"
+  | "secondary"
+  | "scales"
+  | "voicing"
+  | "solo";
 type RecentPracticeSession = {
   id: string;
   title: string;
@@ -278,6 +287,14 @@ const viewModeLabels: Record<ViewMode, string> = {
   normal: "Normal",
   study: "Study",
 };
+const defaultOpenStudySections: TheorySectionId[] = ["summary", "roman"];
+const ROOT_NOTE_COLOR = "#F59E0B";
+const ROOT_NOTE_DARK = "#02040A";
+const TARGET_NOTE_COLOR = "#2563EB";
+const GUIDE_TONE_COLOR = "#1E40AF";
+const CHORD_TONE_COLOR = "#334155";
+const SCALE_TONE_COLOR = "#1E293B";
+const DISABLED_NOTE_COLOR = "#0F172A";
 
 type ProgressionAnalysis = ReturnType<typeof analyzeProgression>;
 type PracticeItem = ProgressionAnalysis["items"][number];
@@ -288,6 +305,7 @@ type VoicingPair = {
 };
 
 const majorScaleSteps = [0, 2, 4, 5, 7, 9, 11];
+const standardTuningNotes = ["E", "A", "D", "G", "B", "E"];
 const soloRhythmPrompts = [
   "한 마디는 쉬고, 다음 마디에 짧게 답하기",
   "8분음표 두 개와 긴 음 하나만 쓰기",
@@ -381,6 +399,108 @@ function parseFretString(frets: string) {
 
     return fret;
   });
+}
+
+function getChordRootSymbol(symbol: string) {
+  const match = symbol.split("/")[0].trim().match(/^([A-G](?:#|b)?)/);
+  return match?.[1] ?? "";
+}
+
+function sameNotePitch(noteA?: string, noteB?: string) {
+  if (!noteA || !noteB) return false;
+  return getNoteIndex(noteA) === getNoteIndex(noteB);
+}
+
+function getStringNoteAtFret(stringIndex: number, fret: number) {
+  const openNote = standardTuningNotes[stringIndex] ?? "E";
+  return sharpNotes[(getNoteIndex(openNote) + fret) % 12];
+}
+
+function getGuitarStringNumber(stringIndex: number) {
+  return 6 - stringIndex;
+}
+
+function formatRootPosition(stringIndex: number, fret: number, note: string) {
+  const stringNumber = getGuitarStringNumber(stringIndex);
+  const fretLabel = fret === 0 ? "개방현" : `${fret}프렛`;
+  return `${stringNumber}번줄 ${fretLabel} ${note}`;
+}
+
+function getGuideToneNotes(symbol: string, voicing?: GuitarVoicing) {
+  if (voicing?.guideTones?.length) return voicing.guideTones;
+
+  const chordInfo = getChordInfo(symbol);
+  if (!chordInfo) return [];
+
+  return [chordInfo.notes[1], chordInfo.notes[3]].filter(Boolean);
+}
+
+function getGuideToneHint(symbol: string, voicing: GuitarVoicing) {
+  if (voicing.guideToneHint) return voicing.guideToneHint;
+
+  const chordInfo = getChordInfo(symbol);
+  if (!chordInfo || chordInfo.notes.length < 2) return "핵심음 미등록";
+
+  const third = chordInfo.notes[1];
+  const seventh = chordInfo.notes[3];
+
+  return seventh ? `3도 ${third}, 7도 ${seventh}` : `3도 ${third}`;
+}
+
+function getVoicingRootPositions(
+  voicing: GuitarVoicing,
+  symbol: string
+) {
+  const frets = parseFretString(voicing.frets).slice(0, 6);
+  const rootNote = voicing.rootNote ?? getChordRootSymbol(symbol);
+
+  if (!rootNote) return [];
+
+  if (
+    typeof voicing.rootString === "number" &&
+    typeof voicing.rootFret === "number"
+  ) {
+    const stringIndex = 6 - voicing.rootString;
+
+    if (stringIndex >= 0 && stringIndex < 6) {
+      return [
+        {
+          stringIndex,
+          fret: voicing.rootFret,
+          note: voicing.rootNote ?? getStringNoteAtFret(stringIndex, voicing.rootFret),
+        },
+      ];
+    }
+  }
+
+  return frets
+    .map((fret, stringIndex) => {
+      if (fret === null) return null;
+
+      const note = getStringNoteAtFret(stringIndex, fret);
+
+      if (!sameNotePitch(note, rootNote)) return null;
+
+      return { stringIndex, fret, note };
+    })
+    .filter(
+      (position): position is { stringIndex: number; fret: number; note: string } =>
+        position !== null
+    );
+}
+
+function getRootHint(symbol: string, voicing: GuitarVoicing) {
+  if (voicing.rootHint) return voicing.rootHint;
+
+  const rootPosition = getVoicingRootPositions(voicing, symbol)[0];
+
+  if (!rootPosition) return "루트 위치 미등록";
+
+  return formatRootPosition(
+    rootPosition.stringIndex,
+    rootPosition.fret,
+    rootPosition.note
+  );
 }
 
 function calculateVoicingDistance(currentFrets: string, nextFrets: string) {
@@ -644,6 +764,9 @@ export default function Home() {
   const [practiceMode, setPracticeMode] = useState(true);
   const [trainingMode, setTrainingMode] = useState<TrainingMode>("chords");
   const [viewMode, setViewMode] = useState<ViewMode>("minimal");
+  const [openStudySections, setOpenStudySections] = useState<TheorySectionId[]>(
+    defaultOpenStudySections
+  );
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const [bpm, setBpm] = useState(80);
@@ -988,6 +1111,14 @@ function updateTrainingMode(nextTrainingMode: TrainingMode) {
   setTrainingMode(nextTrainingMode);
   setFocusMode(false);
   resetPracticePlayback();
+}
+
+function toggleStudySection(sectionId: TheorySectionId) {
+  setOpenStudySections((prev) =>
+    prev.includes(sectionId)
+      ? prev.filter((id) => id !== sectionId)
+      : [...prev, sectionId]
+  );
 }
 
 function removeFavoriteProgression(id: string) {
@@ -1947,67 +2078,49 @@ useEffect(() => {
             <Info title="로마숫자" value={progressionAnalysis.romanLine || "-"} />
           </div>
 
-          {viewMode === "study" &&
-            analysisKey === "auto" &&
-            progressionAnalysis.candidateKeys.length > 0 && (
-              <div className="mt-5 rounded-lg border border-blue-900/30 bg-[#0A1220] p-4">
-                <p className="text-sm font-black uppercase tracking-[0.22em] text-[#64748B]">
-                  자동 추정 후보
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {progressionAnalysis.candidateKeys
-                    .slice(0, 5)
-                    .map((candidate) => (
-                      <span
-                        key={candidate.key}
-                        className="rounded-lg border border-blue-900/30 bg-[#07111F] px-3 py-1 text-sm font-bold text-[#94A3B8]"
-                      >
-                        {candidate.key} / 매칭 {candidate.matchedCount}개
-                      </span>
-                    ))}
-                </div>
-              </div>
-            )}
-
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
-            {progressionAnalysis.items.map((item) => (
-              <article
-                key={`${item.index}-${item.symbol}`}
-                className="rounded-lg border border-blue-900/30 bg-[#0A1220] p-4 transition hover:border-blue-700/60"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-2xl font-black text-[#E5E7EB]">
-                    {item.symbol}
-                  </h3>
-                  <Badge>{item.roman}</Badge>
-                </div>
-
-                <p className="mt-2 text-sm font-bold text-[#94A3B8]">
-                  {item.functionName}
-                </p>
-
-                {viewMode !== "minimal" && (
-                  <p className="mt-3 leading-6 text-[#CBD5E1]">
-                    {item.explanation}
-                  </p>
-                )}
-
-                {viewMode !== "minimal" && item.notes.length > 0 && (
-                  <p className="mt-3 text-sm text-slate-500">
-                    구성음: {item.notes.join(", ")}
-                  </p>
-                )}
-
-                {viewMode === "study" && (
-                  <div className="mt-3 rounded-lg border border-blue-900/30 bg-[#050B16] p-3 text-sm leading-6 text-[#94A3B8]">
-                    <p>상태: {item.status}</p>
-                    <p>스케일: {currentSoloScale.join(", ") || "-"}</p>
-                    <p>{item.functionDescription}</p>
+          {viewMode === "study" ? (
+            <TheoryAccordion
+              progressionAnalysis={progressionAnalysis}
+              currentSoloScale={currentSoloScale}
+              currentPracticeItem={currentPracticeItem}
+              nextPracticeItem={nextPracticeItem}
+              bestVoicingPair={bestVoicingPair}
+              openSections={openStudySections}
+              onToggle={toggleStudySection}
+            />
+          ) : (
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {progressionAnalysis.items.map((item) => (
+                <article
+                  key={`${item.index}-${item.symbol}`}
+                  className="rounded-lg border border-blue-900/30 bg-[#0A1220] p-4 transition hover:border-blue-700/60"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-2xl font-black text-[#E5E7EB]">
+                      {item.symbol}
+                    </h3>
+                    <Badge>{item.roman}</Badge>
                   </div>
-                )}
-              </article>
-            ))}
-          </div>
+
+                  <p className="mt-2 text-sm font-bold text-[#94A3B8]">
+                    {item.functionName}
+                  </p>
+
+                  {viewMode === "normal" && (
+                    <p className="mt-3 leading-6 text-[#CBD5E1]">
+                      {item.explanation}
+                    </p>
+                  )}
+
+                  {viewMode === "normal" && item.notes.length > 0 && (
+                    <p className="mt-3 text-sm text-slate-500">
+                      구성음: {item.notes.join(", ")}
+                    </p>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
 
         </Panel>
 
@@ -2306,6 +2419,239 @@ function ViewModeTabs({
           {viewModeLabels[mode]}
         </button>
       ))}
+    </div>
+  );
+}
+
+function TheoryAccordion({
+  progressionAnalysis,
+  currentSoloScale,
+  currentPracticeItem,
+  nextPracticeItem,
+  bestVoicingPair,
+  openSections,
+  onToggle,
+}: {
+  progressionAnalysis: ProgressionAnalysis;
+  currentSoloScale: string[];
+  currentPracticeItem: PracticeItem | undefined;
+  nextPracticeItem: PracticeItem | undefined;
+  bestVoicingPair: VoicingPair | null;
+  openSections: TheorySectionId[];
+  onToggle: (sectionId: TheorySectionId) => void;
+}) {
+  const borrowedItems = progressionAnalysis.items.filter(
+    (item) => item.status === "borrowed"
+  );
+  const secondaryItems = progressionAnalysis.items.filter(
+    (item) => item.status === "secondaryDominant"
+  );
+  const targetNote = nextPracticeItem?.notes[0] ?? currentSoloScale[0] ?? "-";
+  const landingNote = currentPracticeItem?.notes[1] ?? targetNote;
+  const sections: {
+    id: TheorySectionId;
+    title: string;
+    summary: string;
+    content: React.ReactNode;
+  }[] = [
+    {
+      id: "summary",
+      title: "진행 한 줄 요약",
+      summary: progressionAnalysis.chordLine || "-",
+      content: (
+        <div className="grid gap-3 md:grid-cols-3">
+          <Info title="조성" value={progressionAnalysis.selectedKey} />
+          <Info title="진행" value={progressionAnalysis.chordLine || "-"} />
+          <Info title="로마숫자" value={progressionAnalysis.romanLine || "-"} />
+        </div>
+      ),
+    },
+    {
+      id: "roman",
+      title: "로마숫자 분석",
+      summary: progressionAnalysis.romanLine || "-",
+      content: (
+        <div className="grid gap-2 md:grid-cols-2">
+          {progressionAnalysis.items.map((item) => (
+            <TheoryMiniRow
+              key={`roman-${item.index}-${item.symbol}`}
+              title={`${item.symbol} / ${item.roman}`}
+              value={item.explanation}
+            />
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: "function",
+      title: "기능 분석",
+      summary: "토닉, 서브도미넌트, 도미넌트 흐름",
+      content: (
+        <div className="grid gap-2 md:grid-cols-2">
+          {progressionAnalysis.items.map((item) => (
+            <TheoryMiniRow
+              key={`function-${item.index}-${item.symbol}`}
+              title={`${item.symbol} / ${item.functionName}`}
+              value={item.functionDescription}
+            />
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: "borrowed",
+      title: "차용화음 / 모달 인터체인지",
+      summary:
+        borrowedItems.length > 0
+          ? `${borrowedItems.length}개 감지`
+          : "감지된 차용화음 없음",
+      content:
+        borrowedItems.length > 0 ? (
+          <div className="grid gap-2">
+            {borrowedItems.map((item) => (
+              <TheoryMiniRow
+                key={`borrowed-${item.index}-${item.symbol}`}
+                title={`${item.symbol} / ${item.roman}`}
+                value={item.explanation}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm leading-6 text-[#94A3B8]">
+            현재 진행에서는 차용화음으로 분류된 코드가 없습니다.
+          </p>
+        ),
+    },
+    {
+      id: "secondary",
+      title: "세컨더리 도미넌트",
+      summary:
+        secondaryItems.length > 0
+          ? `${secondaryItems.length}개 감지`
+          : "감지된 세컨더리 도미넌트 없음",
+      content:
+        secondaryItems.length > 0 ? (
+          <div className="grid gap-2">
+            {secondaryItems.map((item) => (
+              <TheoryMiniRow
+                key={`secondary-${item.index}-${item.symbol}`}
+                title={`${item.symbol} / ${item.roman}`}
+                value={item.explanation}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm leading-6 text-[#94A3B8]">
+            현재 진행에서는 세컨더리 도미넌트로 분류된 코드가 없습니다.
+          </p>
+        ),
+    },
+    {
+      id: "scales",
+      title: "관련 스케일",
+      summary: `${progressionAnalysis.selectedKeyRoot} major`,
+      content: (
+        <div className="flex flex-wrap gap-2">
+          {currentSoloScale.map((note) => (
+            <span
+              key={`scale-${note}`}
+              className="rounded-md border border-blue-900/30 bg-[#0B1730] px-3 py-2 text-sm font-black text-[#CBD5E1]"
+            >
+              {note}
+            </span>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: "voicing",
+      title: "보이싱 연결 해설",
+      summary: bestVoicingPair
+        ? getMovementLabel(bestVoicingPair.distance)
+        : "추천 연결 없음",
+      content: bestVoicingPair ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          <TheoryMiniRow
+            title={bestVoicingPair.currentVoicing.name}
+            value={`루트: ${getRootHint(
+              currentPracticeItem?.symbol ?? "",
+              bestVoicingPair.currentVoicing
+            )}`}
+          />
+          <TheoryMiniRow
+            title={bestVoicingPair.nextVoicing.name}
+            value={`루트: ${getRootHint(
+              nextPracticeItem?.symbol ?? "",
+              bestVoicingPair.nextVoicing
+            )}`}
+          />
+        </div>
+      ) : (
+        <p className="text-sm leading-6 text-[#94A3B8]">
+          현재/다음 코드의 보이싱 후보가 부족해 연결 해설을 만들 수 없습니다.
+        </p>
+      ),
+    },
+    {
+      id: "solo",
+      title: "솔로 타겟 노트 해설",
+      summary: `타겟 ${targetNote} / 추천 착지 3도 ${landingNote}`,
+      content: (
+        <div className="grid gap-3 md:grid-cols-3">
+          <Info title="현재 코드" value={currentPracticeItem?.symbol ?? "-"} />
+          <Info title="타겟 노트" value={targetNote} />
+          <Info title="추천 착지" value={`3도 ${landingNote}`} />
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="mt-5 space-y-3">
+      {sections.map((section) => {
+        const isOpen = openSections.includes(section.id);
+
+        return (
+          <section
+            key={section.id}
+            className={`rounded-lg border ${
+              isOpen
+                ? "border-blue-800/40 bg-[#0A1220]"
+                : "border-blue-900/30 bg-[#050B16]"
+            }`}
+          >
+            <button
+              onClick={() => onToggle(section.id)}
+              className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+            >
+              <div>
+                <h3 className="text-base font-black text-[#E5E7EB]">
+                  {section.title}
+                </h3>
+                <p className="mt-1 text-sm text-[#94A3B8]">{section.summary}</p>
+              </div>
+              <span className="rounded-md border border-blue-900/30 bg-[#02040A] px-2 py-1 text-xs font-black text-[#94A3B8]">
+                {isOpen ? "접기" : "열기"}
+              </span>
+            </button>
+
+            {isOpen && (
+              <div className="border-t border-blue-900/30 px-4 py-4">
+                {section.content}
+              </div>
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function TheoryMiniRow({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-blue-900/30 bg-[#07111F] p-3">
+      <p className="font-black text-[#E5E7EB]">{title}</p>
+      <p className="mt-1 text-sm leading-6 text-[#94A3B8]">{value}</p>
     </div>
   );
 }
@@ -2649,6 +2995,7 @@ function SoloPracticePanel({
       ? currentPracticeItem.notes
       : soloScaleNotes.slice(0, 4);
   const targetNote = nextPracticeItem?.notes[0] ?? selectedKeyRoot;
+  const landingNote = chordTones[1] ?? targetNote;
   const rhythmPrompt =
     soloRhythmPrompts[currentIndex % soloRhythmPrompts.length];
   const constraintPrompt =
@@ -2675,10 +3022,25 @@ function SoloPracticePanel({
         <SoloInfoBlock title="현재 코드톤" notes={chordTones} />
       </div>
 
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <PracticeMiniCard title="현재 코드" value={currentPracticeItem.symbol} />
+        <PracticeMiniCard title="타겟 노트" value={targetNote} />
+        <PracticeMiniCard title="추천 착지" value={`3도 ${landingNote}`} />
+      </div>
+
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <PracticeMiniCard title="리듬 제한" value={rhythmPrompt} />
         <PracticeMiniCard title="프레이즈 제한" value={constraintPrompt} />
       </div>
+
+      <FretboardMap
+        keyRoot={selectedKeyRoot}
+        currentChordSymbol={currentPracticeItem.symbol}
+        currentChordNotes={chordTones}
+        scaleNotes={soloScaleNotes}
+        targetNotes={[targetNote]}
+        mode="solo"
+      />
     </section>
   );
 }
@@ -2701,6 +3063,163 @@ function SoloInfoBlock({ title, notes }: { title: string; notes: string[] }) {
   );
 }
 
+type FretboardMapProps = {
+  keyRoot: string;
+  currentChordSymbol: string;
+  currentChordNotes: string[];
+  scaleNotes: string[];
+  targetNotes?: string[];
+  mode: "chord" | "solo";
+};
+
+function FretboardMap({
+  keyRoot,
+  currentChordSymbol,
+  currentChordNotes,
+  scaleNotes,
+  targetNotes = [],
+  mode,
+}: FretboardMapProps) {
+  const rootNote = currentChordNotes[0] ?? getChordRootSymbol(currentChordSymbol);
+  const thirdNote = currentChordNotes[1];
+  const fifthNote = currentChordNotes[2];
+  const seventhNote = currentChordNotes[3];
+  const frets = Array.from({ length: 13 }, (_, index) => index);
+
+  function getFretRole(note: string) {
+    if (sameNotePitch(note, rootNote)) return "root";
+    if (targetNotes.some((targetNote) => sameNotePitch(note, targetNote))) {
+      return "target";
+    }
+    if (sameNotePitch(note, thirdNote) || sameNotePitch(note, seventhNote)) {
+      return "guide";
+    }
+    if (sameNotePitch(note, fifthNote)) return "chord";
+    if (currentChordNotes.some((chordNote) => sameNotePitch(note, chordNote))) {
+      return "chord";
+    }
+    if (scaleNotes.some((scaleNote) => sameNotePitch(note, scaleNote))) {
+      return "scale";
+    }
+    return "inactive";
+  }
+
+  function getRoleStyle(role: string) {
+    if (role === "root") {
+      return {
+        backgroundColor: ROOT_NOTE_COLOR,
+        borderColor: "rgba(251, 191, 36, 0.45)",
+        color: ROOT_NOTE_DARK,
+        boxShadow: "0 0 16px rgba(245,158,11,0.24)",
+      };
+    }
+
+    if (role === "target") {
+      return {
+        backgroundColor: TARGET_NOTE_COLOR,
+        borderColor: "rgba(37, 99, 235, 0.5)",
+        color: "#E5E7EB",
+      };
+    }
+
+    if (role === "guide") {
+      return {
+        backgroundColor: GUIDE_TONE_COLOR,
+        borderColor: "rgba(30, 64, 175, 0.5)",
+        color: "#E5E7EB",
+      };
+    }
+
+    if (role === "chord") {
+      return {
+        backgroundColor: CHORD_TONE_COLOR,
+        borderColor: "rgba(71, 85, 105, 0.7)",
+        color: "#E5E7EB",
+      };
+    }
+
+    if (role === "scale") {
+      return {
+        backgroundColor: SCALE_TONE_COLOR,
+        borderColor: "rgba(30, 64, 175, 0.22)",
+        color: "#94A3B8",
+      };
+    }
+
+    return {
+      backgroundColor: DISABLED_NOTE_COLOR,
+      borderColor: "rgba(15, 23, 42, 0.9)",
+      color: "#334155",
+    };
+  }
+
+  return (
+    <section className="mt-4 rounded-lg border border-blue-900/30 bg-[#050B16] p-4">
+      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase text-[#64748B]">
+            Fretboard Map
+          </p>
+          <h4 className="mt-1 text-lg font-black text-[#E5E7EB]">
+            {keyRoot} major / {currentChordSymbol}
+          </h4>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs font-bold">
+          <span className="rounded-md px-2 py-1" style={{ backgroundColor: ROOT_NOTE_COLOR, color: ROOT_NOTE_DARK }}>
+            Root
+          </span>
+          <span className="rounded-md bg-[#2563EB] px-2 py-1 text-white">
+            Target
+          </span>
+          <span className="rounded-md bg-[#1E40AF] px-2 py-1 text-white">
+            3도/7도
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-4 overflow-x-auto pb-1">
+        <div className="min-w-[840px]">
+          <div className="grid grid-cols-[36px_repeat(13,_1fr)] gap-1 text-center text-xs font-black text-[#64748B]">
+            <span />
+            {frets.map((fret) => (
+              <span key={`fret-label-${fret}`}>{fret}</span>
+            ))}
+          </div>
+
+          <div className="mt-2 space-y-1">
+            {standardTuningNotes.map((stringNote, stringIndex) => (
+              <div
+                key={`${mode}-${stringNote}-${stringIndex}`}
+                className="grid grid-cols-[36px_repeat(13,_1fr)] gap-1"
+              >
+                <div className="flex items-center justify-end pr-2 text-xs font-black text-[#64748B]">
+                  {stringNote}
+                </div>
+                {frets.map((fret) => {
+                  const note = getStringNoteAtFret(stringIndex, fret);
+                  const role = getFretRole(note);
+                  const style = getRoleStyle(role);
+
+                  return (
+                    <div
+                      key={`${stringIndex}-${fret}`}
+                      className="flex h-8 items-center justify-center rounded-md border text-xs font-black"
+                      style={style}
+                      title={`${stringNote} string ${fret} fret: ${note}`}
+                    >
+                      {role === "inactive" ? "" : note}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function PracticeVoicingCard({
   label,
   symbol,
@@ -2710,8 +3229,8 @@ function PracticeVoicingCard({
   symbol: string;
   voicing: GuitarVoicing;
 }) {
-  const rootHint = voicing.rootHint ?? "루트 위치 미등록";
-  const guideToneHint = voicing.guideToneHint ?? "핵심음 미등록";
+  const rootHint = getRootHint(symbol, voicing);
+  const guideToneHint = getGuideToneHint(symbol, voicing);
 
   return (
     <div className="rounded-lg border border-blue-900/30 bg-[#050B16] p-4">
@@ -2726,9 +3245,11 @@ function PracticeVoicingCard({
       </div>
 
       <p className="mt-2 text-sm font-bold text-[#CBD5E1]">{voicing.name}</p>
-      <ChordDiagram voicing={voicing} />
+      <ChordDiagram symbol={symbol} voicing={voicing} />
       <div className="mt-3 rounded-lg border border-blue-900/30 bg-[#0A1220] p-3 text-sm leading-6">
-        <p className="font-bold text-[#E5E7EB]">루트: {rootHint}</p>
+        <p className="font-black" style={{ color: ROOT_NOTE_COLOR }}>
+          루트: {rootHint}
+        </p>
         <p className="text-[#94A3B8]">핵심음: {guideToneHint}</p>
       </div>
       <p className="mt-2 text-sm leading-6 text-[#64748B]">{voicing.note}</p>
@@ -2736,7 +3257,13 @@ function PracticeVoicingCard({
   );
 }
 
-function ChordDiagram({ voicing }: { voicing: GuitarVoicing }) {
+function ChordDiagram({
+  symbol,
+  voicing,
+}: {
+  symbol: string;
+  voicing: GuitarVoicing;
+}) {
   const frets = parseFretString(voicing.frets).slice(0, 6);
   const pressedFrets = frets.filter(
     (fret): fret is number => typeof fret === "number" && fret > 0
@@ -2746,6 +3273,23 @@ function ChordDiagram({ voicing }: { voicing: GuitarVoicing }) {
   const baseFret = minPressedFret > 4 ? minPressedFret : 1;
   const visibleFrets = Array.from({ length: 5 }, (_, index) => baseFret + index);
   const stringNames = ["E", "A", "D", "G", "B", "E"];
+  const rootPositions = getVoicingRootPositions(voicing, symbol);
+  const guideToneNotes = getGuideToneNotes(symbol, voicing);
+
+  function getMarkerRole(stringIndex: number, fret: number) {
+    const note = getStringNoteAtFret(stringIndex, fret);
+    const isRoot = rootPositions.some(
+      (position) =>
+        position.stringIndex === stringIndex && position.fret === fret
+    );
+    const isGuideTone = guideToneNotes.some((guideTone) =>
+      sameNotePitch(guideTone, note)
+    );
+
+    if (isRoot) return "root";
+    if (isGuideTone) return "guide";
+    return "chord";
+  }
 
   return (
     <div
@@ -2753,11 +3297,25 @@ function ChordDiagram({ voicing }: { voicing: GuitarVoicing }) {
       aria-label={`${voicing.name} 기타 코드 다이어그램`}
     >
       <div className="grid grid-cols-6 text-center text-xs font-black text-[#64748B]">
-        {frets.map((fret, index) => (
-          <span key={`${voicing.name}-status-${index}`}>
-            {fret === null ? "x" : fret === 0 ? "o" : ""}
-          </span>
-        ))}
+        {frets.map((fret, index) => {
+          const role = fret === 0 ? getMarkerRole(index, 0) : "inactive";
+
+          return (
+            <span
+              key={`${voicing.name}-status-${index}`}
+              className={`mx-auto flex h-5 w-5 items-center justify-center rounded-full ${
+                role === "root"
+                  ? "text-[#02040A] shadow-[0_0_16px_rgba(245,158,11,0.24)]"
+                  : role === "guide"
+                    ? "bg-[#1E40AF] text-white"
+                    : ""
+              }`}
+              style={role === "root" ? { backgroundColor: ROOT_NOTE_COLOR } : undefined}
+            >
+              {fret === null ? "x" : fret === 0 ? (role === "root" ? "R" : "o") : ""}
+            </span>
+          );
+        })}
       </div>
 
       <div className="mt-2 flex gap-3">
@@ -2789,16 +3347,37 @@ function ChordDiagram({ voicing }: { voicing: GuitarVoicing }) {
 
           {frets.map((fret, stringIndex) => {
             if (!fret || fret < baseFret || fret > baseFret + 4) return null;
+            const markerRole = getMarkerRole(stringIndex, fret);
+            const markerColor =
+              markerRole === "root"
+                ? ROOT_NOTE_COLOR
+                : markerRole === "guide"
+                  ? GUIDE_TONE_COLOR
+                  : CHORD_TONE_COLOR;
 
             return (
               <span
                 key={`${voicing.name}-marker-${stringIndex}-${fret}`}
-                className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1D4ED8] shadow-sm shadow-black/40"
+                className={`absolute flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[10px] font-black shadow-sm shadow-black/40 ${
+                  markerRole === "root"
+                    ? "text-[#02040A] shadow-[0_0_16px_rgba(245,158,11,0.24)]"
+                    : "text-white"
+                }`}
+                title={`${getStringNoteAtFret(stringIndex, fret)} ${
+                  markerRole === "root" ? "루트음" : ""
+                }`}
                 style={{
                   left: `${(stringIndex / 5) * 100}%`,
                   top: `${((fret - baseFret + 0.5) / 5) * 100}%`,
+                  backgroundColor: markerColor,
+                  border:
+                    markerRole === "root"
+                      ? "1px solid rgba(251, 191, 36, 0.45)"
+                      : "1px solid rgba(30, 64, 175, 0.28)",
                 }}
-              />
+              >
+                {markerRole === "root" ? "R" : ""}
+              </span>
             );
           })}
         </div>

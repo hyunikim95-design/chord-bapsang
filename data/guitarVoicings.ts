@@ -4,6 +4,10 @@ export type GuitarVoicing = {
   fingering?: string;
   rootHint?: string;
   guideToneHint?: string;
+  rootString?: number;
+  rootFret?: number;
+  rootNote?: string;
+  guideTones?: string[];
   note: string;
   difficulty: "쉬움" | "중간" | "어려움";
 };
