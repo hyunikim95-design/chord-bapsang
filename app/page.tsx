@@ -407,6 +407,21 @@ function parseFretString(frets: string) {
   });
 }
 
+function parseFingeringString(fingering?: string) {
+  if (!fingering) return [];
+
+  const tokens = fingering.includes(" ")
+    ? fingering.trim().split(/\s+/)
+    : fingering.trim().split("");
+
+  return tokens.slice(0, 6).map((token) => {
+    const normalized = token.toLowerCase();
+    if (normalized === "x" || normalized === "0") return null;
+
+    return /^[1-4]$/.test(normalized) ? normalized : null;
+  });
+}
+
 function getChordRootSymbol(symbol: string) {
   const match = symbol.split("/")[0].trim().match(/^([A-G](?:#|b)?)/);
   return match?.[1] ?? "";
@@ -577,6 +592,24 @@ function getMovementLabel(distance: number) {
   return "이동 많음";
 }
 
+function formatFingerLabel(finger: string) {
+  const labels: Record<string, string> = {
+    "1": "1번 손가락",
+    "2": "2번 손가락",
+    "3": "3번 손가락",
+    "4": "4번 손가락",
+  };
+
+  return labels[finger] ?? `${finger}번 손가락`;
+}
+
+function formatStringFret(stringIndex: number, fret: number) {
+  const stringNumber = getGuitarStringNumber(stringIndex);
+  const fretLabel = fret === 0 ? "개방현" : `${fret}프렛`;
+
+  return `${stringNumber}번줄 ${fretLabel}`;
+}
+
 function getFocusMovementHint(
   currentSymbol: string,
   nextSymbol: string | undefined,
@@ -604,6 +637,71 @@ function getFocusMovementHint(
   }
 
   return `다음 이동: ${currentSymbol} → ${nextSymbol}, ${moveLabel} 연결. 루트 위치와 공통음을 확인`;
+}
+
+function getEnhancedFocusMovementHint(
+  currentSymbol: string,
+  nextSymbol: string | undefined,
+  pair: VoicingPair | null
+) {
+  if (!pair || !nextSymbol) {
+    return getFocusMovementHint(currentSymbol, nextSymbol, pair);
+  }
+
+  const currentFrets = parseFretString(pair.currentVoicing.frets).slice(0, 6);
+  const nextFrets = parseFretString(pair.nextVoicing.frets).slice(0, 6);
+  const currentFingers = parseFingeringString(pair.currentVoicing.fingering);
+  const nextFingers = parseFingeringString(pair.nextVoicing.fingering);
+  const fingerHints: string[] = [];
+  const commonToneHints: string[] = [];
+
+  for (let stringIndex = 0; stringIndex < 6; stringIndex += 1) {
+    const currentFinger = currentFingers[stringIndex];
+    const nextFinger = nextFingers[stringIndex];
+    const currentFret = currentFrets[stringIndex];
+    const nextFret = nextFrets[stringIndex];
+
+    if (
+      currentFinger &&
+      nextFinger &&
+      currentFinger === nextFinger &&
+      typeof currentFret === "number" &&
+      typeof nextFret === "number"
+    ) {
+      if (currentFret === nextFret) {
+        fingerHints.push(
+          `${formatFingerLabel(currentFinger)} ${formatStringFret(
+            stringIndex,
+            currentFret
+          )} 유지`
+        );
+      } else {
+        fingerHints.push(
+          `${formatFingerLabel(currentFinger)} ${formatStringFret(
+            stringIndex,
+            currentFret
+          )}에서 ${formatStringFret(stringIndex, nextFret)}로 이동`
+        );
+      }
+    }
+
+    if (
+      typeof currentFret === "number" &&
+      typeof nextFret === "number" &&
+      currentFret === nextFret
+    ) {
+      commonToneHints.push(`${getStringNoteAtFret(stringIndex, currentFret)} 공통음 유지`);
+    }
+  }
+
+  const currentRoot = getRootHint(currentSymbol, pair.currentVoicing);
+  const nextRoot = getRootHint(nextSymbol, pair.nextVoicing);
+  const mainHint =
+    fingerHints[0] ??
+    commonToneHints[0] ??
+    `${currentSymbol}에서 ${nextSymbol}로 ${getMovementLabel(pair.distance)} 연결`;
+
+  return `NEXT MOVE: ${mainHint}. 루트: ${currentRoot} → ${nextRoot}.`;
 }
 
 function getResolutionCandidates(nextItem: PracticeItem | undefined) {
@@ -3047,7 +3145,7 @@ function PracticePanel({
   onTogglePlay: () => void;
   onClose: () => void;
 }) {
-  const focusMovementHint = getFocusMovementHint(
+  const focusMovementHint = getEnhancedFocusMovementHint(
     currentPracticeItem.symbol,
     nextPracticeItem?.symbol,
     bestVoicingPair
@@ -3317,6 +3415,17 @@ function SoloPracticePanel({
     rhythmPrompt,
     constraintPrompt
   );
+  const soloQuality = getChordQualityKey(currentPracticeItem.symbol);
+  const soloApproach =
+    soloQuality === "dominant7"
+      ? `접근: 아래 반음에서 ${soloRecommendation.targetNote}으로 접근`
+      : soloQuality === "maj7" || soloQuality === "maj9"
+        ? `접근: 루트보다 ${soloRecommendation.targetNote}을 먼저 노리기`
+        : soloQuality === "m7" || soloQuality === "m9" || soloQuality === "m7b5"
+          ? `접근: b3/b7 후보 ${soloRecommendation.alternateTargets.join(", ")} 확인`
+          : `접근: 3도 ${soloRecommendation.targetNote}을 중심으로 시작`;
+  const soloResolution = `해결: 다음 코드에서 ${soloRecommendation.resolution} 착지`;
+  const soloMission = `${soloApproach}. ${soloResolution}. ${soloRecommendation.exercise}`;
   const targetNotes = soloRecommendation.alternateTargets.length
     ? soloRecommendation.alternateTargets
     : [soloRecommendation.targetNote];
@@ -3352,6 +3461,15 @@ function SoloPracticePanel({
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <PracticeMiniCard title="리듬 제한" value={rhythmPrompt} />
         <PracticeMiniCard title="연습 과제" value={soloRecommendation.exercise} />
+      </div>
+
+      <div className="mt-4 rounded-lg border border-blue-900/30 bg-[#0A1220] p-3">
+        <p className="text-xs font-black uppercase text-[#64748B]">
+          Solo Mission
+        </p>
+        <p className="mt-2 text-sm font-black leading-6 text-[#CBD5E1]">
+          {soloMission}
+        </p>
       </div>
 
       {compact ? (
@@ -3576,6 +3694,7 @@ function PracticeVoicingCard({
 }) {
   const rootHint = getRootHint(symbol, voicing);
   const guideToneHint = getGuideToneHint(symbol, voicing);
+  const hasFingering = parseFingeringString(voicing.fingering).some(Boolean);
 
   return (
     <div
@@ -3600,6 +3719,11 @@ function PracticeVoicingCard({
           루트: {rootHint}
         </p>
         <p className="text-[#94A3B8]">핵심음: {guideToneHint}</p>
+        <p className="mt-1 text-xs font-bold text-[#64748B]">
+          {hasFingering
+            ? "운지: 1 검지 · 2 중지 · 3 약지 · 4 새끼"
+            : "운지 정보 미등록"}
+        </p>
       </div>
       {!compact && (
         <p className="mt-2 text-sm leading-6 text-[#64748B]">{voicing.note}</p>
@@ -3628,6 +3752,7 @@ function ChordDiagram({
   const stringNames = ["E", "A", "D", "G", "B", "E"];
   const rootPositions = getVoicingRootPositions(voicing, symbol);
   const guideToneNotes = getGuideToneNotes(symbol, voicing);
+  const fingerings = parseFingeringString(voicing.fingering);
   const boardHeightClass = compact ? "h-44" : "h-36";
   const dotSizeClass = compact ? "h-7 w-7 text-xs" : "h-5 w-5 text-[10px]";
   const topMarkerSizeClass = compact ? "h-7 w-7" : "h-5 w-5";
@@ -3727,6 +3852,9 @@ function ChordDiagram({
                 : markerRole === "guide"
                   ? GUIDE_TONE_COLOR
                   : CHORD_TONE_COLOR;
+            const fingerNumber = fingerings[stringIndex];
+            const markerLabel =
+              fingerNumber ?? (markerRole === "root" ? "R" : "");
 
             return (
               <span
@@ -3749,7 +3877,7 @@ function ChordDiagram({
                       : "1px solid rgba(30, 64, 175, 0.28)",
                 }}
               >
-                {markerRole === "root" ? "R" : ""}
+                {markerLabel}
               </span>
             );
           })}
