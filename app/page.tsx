@@ -592,24 +592,6 @@ function getMovementLabel(distance: number) {
   return "이동 많음";
 }
 
-function formatFingerLabel(finger: string) {
-  const labels: Record<string, string> = {
-    "1": "1번 손가락",
-    "2": "2번 손가락",
-    "3": "3번 손가락",
-    "4": "4번 손가락",
-  };
-
-  return labels[finger] ?? `${finger}번 손가락`;
-}
-
-function formatStringFret(stringIndex: number, fret: number) {
-  const stringNumber = getGuitarStringNumber(stringIndex);
-  const fretLabel = fret === 0 ? "개방현" : `${fret}프렛`;
-
-  return `${stringNumber}번줄 ${fretLabel}`;
-}
-
 function getFocusMovementHint(
   currentSymbol: string,
   nextSymbol: string | undefined,
@@ -650,58 +632,21 @@ function getEnhancedFocusMovementHint(
 
   const currentFrets = parseFretString(pair.currentVoicing.frets).slice(0, 6);
   const nextFrets = parseFretString(pair.nextVoicing.frets).slice(0, 6);
-  const currentFingers = parseFingeringString(pair.currentVoicing.fingering);
-  const nextFingers = parseFingeringString(pair.nextVoicing.fingering);
-  const fingerHints: string[] = [];
-  const commonToneHints: string[] = [];
+  const commonTone = currentFrets
+    .map((fret, stringIndex) => {
+      if (fret === null || nextFrets[stringIndex] !== fret) return null;
+      return getStringNoteAtFret(stringIndex, fret);
+    })
+    .find((note): note is string => Boolean(note));
+  const currentRoot = pair.currentVoicing.rootNote ?? getChordRootSymbol(currentSymbol);
+  const nextRoot = pair.nextVoicing.rootNote ?? getChordRootSymbol(nextSymbol);
+  const rootMove = currentRoot && nextRoot ? `${currentRoot} → ${nextRoot}` : `${currentSymbol} → ${nextSymbol}`;
 
-  for (let stringIndex = 0; stringIndex < 6; stringIndex += 1) {
-    const currentFinger = currentFingers[stringIndex];
-    const nextFinger = nextFingers[stringIndex];
-    const currentFret = currentFrets[stringIndex];
-    const nextFret = nextFrets[stringIndex];
-
-    if (
-      currentFinger &&
-      nextFinger &&
-      currentFinger === nextFinger &&
-      typeof currentFret === "number" &&
-      typeof nextFret === "number"
-    ) {
-      if (currentFret === nextFret) {
-        fingerHints.push(
-          `${formatFingerLabel(currentFinger)} ${formatStringFret(
-            stringIndex,
-            currentFret
-          )} 유지`
-        );
-      } else {
-        fingerHints.push(
-          `${formatFingerLabel(currentFinger)} ${formatStringFret(
-            stringIndex,
-            currentFret
-          )}에서 ${formatStringFret(stringIndex, nextFret)}로 이동`
-        );
-      }
-    }
-
-    if (
-      typeof currentFret === "number" &&
-      typeof nextFret === "number" &&
-      currentFret === nextFret
-    ) {
-      commonToneHints.push(`${getStringNoteAtFret(stringIndex, currentFret)} 공통음 유지`);
-    }
+  if (commonTone) {
+    return `NEXT MOVE: 루트 ${rootMove}. 공통음 ${commonTone} 유지 가능. 다음 코드 루트 먼저 확인.`;
   }
 
-  const currentRoot = getRootHint(currentSymbol, pair.currentVoicing);
-  const nextRoot = getRootHint(nextSymbol, pair.nextVoicing);
-  const mainHint =
-    fingerHints[0] ??
-    commonToneHints[0] ??
-    `${currentSymbol}에서 ${nextSymbol}로 ${getMovementLabel(pair.distance)} 연결`;
-
-  return `NEXT MOVE: ${mainHint}. 루트: ${currentRoot} → ${nextRoot}.`;
+  return `NEXT MOVE: 루트 ${rootMove}. ${getMovementLabel(pair.distance)} 연결. 다음 코드 루트 먼저 확인.`;
 }
 
 function getResolutionCandidates(nextItem: PracticeItem | undefined) {
@@ -3182,16 +3127,21 @@ function PracticePanel({
           </div>
         </div>
 
-        <div className="mt-5 flex gap-2">
-          {Array.from({ length: safeBeatsPerChord }).map((_, index) => (
-            <div
-              key={index}
-              className={`h-3 flex-1 rounded-lg transition ${
-                index + 1 <= beatInChord ? "bg-[#1D4ED8]" : "bg-[#0B1730]"
-              }`}
-            />
-          ))}
-        </div>
+        <PlaybackStatusCard
+          safeBpm={safeBpm}
+          beatInChord={beatInChord}
+          safeBeatsPerChord={safeBeatsPerChord}
+          currentIndex={currentIndex}
+          totalCount={totalCount}
+          isAutoPlaying={isAutoPlaying}
+          countInEnabled={countInEnabled}
+          countInRemaining={countInRemaining}
+        />
+
+        <BeatBar
+          beatInChord={beatInChord}
+          safeBeatsPerChord={safeBeatsPerChord}
+        />
 
         {trainingMode === "solo" ? (
           <SoloPracticePanel
@@ -3223,9 +3173,7 @@ function PracticePanel({
         ) : null}
 
         {trainingMode === "chords" && bestVoicingPair && (
-          <p className="mx-auto mt-3 max-w-[760px] rounded-lg border border-blue-900/30 bg-[#0A1220] p-3 text-sm font-black leading-6 text-[#CBD5E1]">
-            {focusMovementHint}
-          </p>
+          <NextMoveCard hint={focusMovementHint} />
         )}
 
         <PracticeControls
@@ -3272,16 +3220,22 @@ function PracticePanel({
             </div>
           </div>
 
-          <div className="mt-4 flex gap-2">
-            {Array.from({ length: safeBeatsPerChord }).map((_, index) => (
-              <div
-                key={index}
-                className={`h-3 flex-1 rounded-lg transition ${
-                  index + 1 <= beatInChord ? "bg-[#1D4ED8]" : "bg-[#0B1730]"
-                }`}
-              />
-            ))}
-          </div>
+          <BeatBar
+            beatInChord={beatInChord}
+            safeBeatsPerChord={safeBeatsPerChord}
+          />
+
+          <PlaybackStatusCard
+            safeBpm={safeBpm}
+            beatInChord={beatInChord}
+            safeBeatsPerChord={safeBeatsPerChord}
+            currentIndex={currentIndex}
+            totalCount={totalCount}
+            isAutoPlaying={isAutoPlaying}
+            countInEnabled={countInEnabled}
+            countInRemaining={countInRemaining}
+            compact
+          />
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
             <PracticeMiniCard title="BPM / 박자" value={`${safeBpm} / ${safeBeatsPerChord}`} />
@@ -3386,6 +3340,124 @@ function PracticeMiniCard({ title, value }: { title: string; value: string }) {
   );
 }
 
+function BeatBar({
+  beatInChord,
+  safeBeatsPerChord,
+}: {
+  beatInChord: number;
+  safeBeatsPerChord: number;
+}) {
+  return (
+    <div className="mt-4 flex gap-2">
+      {Array.from({ length: safeBeatsPerChord }).map((_, index) => {
+        const beat = index + 1;
+        const isCurrent = beat === beatInChord;
+        const isPast = beat < beatInChord;
+
+        return (
+          <div
+            key={index}
+            className={`h-3 flex-1 rounded-lg transition ${
+              isCurrent
+                ? "bg-[#F59E0B] shadow-[0_0_14px_rgba(245,158,11,0.22)]"
+                : isPast
+                  ? "bg-[#1D4ED8]"
+                  : "bg-[#0B1730]"
+            }`}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function PlaybackStatusCard({
+  safeBpm,
+  beatInChord,
+  safeBeatsPerChord,
+  currentIndex,
+  totalCount,
+  isAutoPlaying,
+  countInEnabled,
+  countInRemaining,
+  compact = false,
+}: {
+  safeBpm: number;
+  beatInChord: number;
+  safeBeatsPerChord: number;
+  currentIndex: number;
+  totalCount: number;
+  isAutoPlaying: boolean;
+  countInEnabled: boolean;
+  countInRemaining: number | null;
+  compact?: boolean;
+}) {
+  const playbackState =
+    countInRemaining !== null
+      ? `Count-in ${countInRemaining}`
+      : isAutoPlaying
+        ? "Playing"
+        : "Stopped";
+
+  return (
+    <div
+      className={`mt-4 rounded-lg border border-blue-900/30 bg-[#050B16] p-3 ${
+        compact ? "" : "md:flex md:items-center md:justify-between"
+      }`}
+    >
+      <div>
+        <p className="text-xs font-black uppercase text-[#64748B]">Playback</p>
+        <p className="mt-1 text-sm font-black text-[#CBD5E1]">
+          {safeBpm} BPM · Beat {beatInChord}/{safeBeatsPerChord} · Chord{" "}
+          {currentIndex + 1}/{totalCount}
+        </p>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2 md:mt-0">
+        <span
+          className={`rounded-md px-2 py-1 text-xs font-black ${
+            countInRemaining !== null
+              ? "bg-[#F59E0B] text-[#02040A]"
+              : isAutoPlaying
+                ? "bg-[#1E40AF] text-white"
+                : "border border-blue-900/30 text-[#94A3B8]"
+          }`}
+        >
+          {playbackState}
+        </span>
+        <span className="rounded-md border border-blue-900/30 px-2 py-1 text-xs font-bold text-[#94A3B8]">
+          Count-in {countInEnabled ? "ON" : "OFF"}
+        </span>
+      </div>
+      {countInRemaining !== null && (
+        <div className="mt-3 rounded-lg border border-amber-400/30 bg-[#02040A] px-3 py-2">
+          <p className="text-xs font-black uppercase text-[#64748B]">
+            Count In
+          </p>
+          <p
+            className="mt-1 text-3xl font-black leading-none"
+            style={{ color: ROOT_NOTE_COLOR }}
+          >
+            {countInRemaining}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NextMoveCard({ hint }: { hint: string }) {
+  const cleanHint = hint.replace(/^NEXT MOVE:\s*/, "");
+
+  return (
+    <div className="mx-auto mt-3 max-w-[760px] rounded-lg border border-blue-900/30 bg-[#0A1220] p-3">
+      <p className="text-xs font-black uppercase text-[#64748B]">Next Move</p>
+      <p className="mt-1 text-sm font-black leading-6 text-[#CBD5E1]">
+        {cleanHint}
+      </p>
+    </div>
+  );
+}
+
 function SoloPracticePanel({
   currentPracticeItem,
   nextPracticeItem,
@@ -3418,14 +3490,13 @@ function SoloPracticePanel({
   const soloQuality = getChordQualityKey(currentPracticeItem.symbol);
   const soloApproach =
     soloQuality === "dominant7"
-      ? `접근: 아래 반음에서 ${soloRecommendation.targetNote}으로 접근`
+      ? `아래 반음에서 ${soloRecommendation.targetNote}으로 접근`
       : soloQuality === "maj7" || soloQuality === "maj9"
-        ? `접근: 루트보다 ${soloRecommendation.targetNote}을 먼저 노리기`
+        ? `루트보다 ${soloRecommendation.targetNote}을 먼저 노리기`
         : soloQuality === "m7" || soloQuality === "m9" || soloQuality === "m7b5"
-          ? `접근: b3/b7 후보 ${soloRecommendation.alternateTargets.join(", ")} 확인`
-          : `접근: 3도 ${soloRecommendation.targetNote}을 중심으로 시작`;
-  const soloResolution = `해결: 다음 코드에서 ${soloRecommendation.resolution} 착지`;
-  const soloMission = `${soloApproach}. ${soloResolution}. ${soloRecommendation.exercise}`;
+          ? `b3/b7 후보 ${soloRecommendation.alternateTargets.join(", ")} 확인`
+          : `3도 ${soloRecommendation.targetNote}을 중심으로 시작`;
+  const soloResolution = `다음 코드에서 ${soloRecommendation.resolution} 착지`;
   const targetNotes = soloRecommendation.alternateTargets.length
     ? soloRecommendation.alternateTargets
     : [soloRecommendation.targetNote];
@@ -3467,9 +3538,17 @@ function SoloPracticePanel({
         <p className="text-xs font-black uppercase text-[#64748B]">
           Solo Mission
         </p>
-        <p className="mt-2 text-sm font-black leading-6 text-[#CBD5E1]">
-          {soloMission}
-        </p>
+        <div className="mt-3 grid gap-2 text-sm font-black leading-6">
+          <p className="text-[#CBD5E1]">
+            타겟{" "}
+            <span style={{ color: ROOT_NOTE_COLOR }}>
+              {soloRecommendation.targetNote}
+            </span>
+          </p>
+          <p className="text-[#94A3B8]">접근: {soloApproach}</p>
+          <p className="text-[#94A3B8]">해결: {soloResolution}</p>
+          <p className="text-[#94A3B8]">리듬: {rhythmPrompt}</p>
+        </div>
       </div>
 
       {compact ? (
