@@ -503,6 +503,13 @@ function getRootHint(symbol: string, voicing: GuitarVoicing) {
   );
 }
 
+function getNoteFrequency(note: string, octave = 2) {
+  const noteIndex = getNoteIndex(note);
+  const midiNote = 12 * (octave + 1) + noteIndex;
+
+  return 440 * 2 ** ((midiNote - 69) / 12);
+}
+
 function calculateVoicingDistance(currentFrets: string, nextFrets: string) {
   const current = parseFretString(currentFrets);
   const next = parseFretString(nextFrets);
@@ -755,6 +762,8 @@ function migrateFavoriteProgressions(
 
 export default function Home() {
   const audioContextRef = useRef<AudioContext | null>(null);
+  const droneOscillatorRef = useRef<OscillatorNode | null>(null);
+  const droneGainRef = useRef<GainNode | null>(null);
   const [input, setInput] = useState("A");
   const [showAdvanced, setShowAdvanced] = useState(true);
 
@@ -773,6 +782,7 @@ export default function Home() {
   const [beatsPerChord, setBeatsPerChord] = useState(4);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const [metronomeEnabled, setMetronomeEnabled] = useState(true);
+  const [rootDroneEnabled, setRootDroneEnabled] = useState(false);
   const [countInEnabled, setCountInEnabled] = useState(true);
   const [countInRemaining, setCountInRemaining] = useState<number | null>(null);
   const [beatInChord, setBeatInChord] = useState(1);
@@ -825,6 +835,9 @@ const [favoriteTitleInput, setFavoriteTitleInput] = useState("");
 
   const bestVoicingPair = getBestVoicingPair(currentVoicings, nextVoicings);
   const selectedKeyRoot = progressionAnalysis.selectedKeyRoot;
+  const currentDroneRoot = currentPracticeItem
+    ? getChordRootSymbol(currentPracticeItem.symbol)
+    : selectedKeyRoot;
   const currentSoloScale = getMajorScaleNotes(selectedKeyRoot);
   const dailyPracticePreset = practicePresets[getDailyPresetIndex()];
   const filteredPracticePresets =
@@ -874,6 +887,66 @@ const [favoriteTitleInput, setFavoriteTitleInput] = useState("");
       oscillator.stop(now + 0.09);
     },
     [metronomeEnabled]
+  );
+
+  const stopRootDrone = React.useCallback(() => {
+    const oscillator = droneOscillatorRef.current;
+    const gain = droneGainRef.current;
+
+    if (!oscillator || !gain) return;
+
+    try {
+      const now = gain.context.currentTime;
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+      oscillator.stop(now + 0.22);
+    } catch {
+      oscillator.disconnect();
+    } finally {
+      droneOscillatorRef.current = null;
+      droneGainRef.current = null;
+    }
+  }, []);
+
+  const startRootDrone = React.useCallback(
+    (rootNote: string) => {
+      if (typeof window === "undefined") return;
+
+      const AudioContextClass =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext;
+
+      if (!AudioContextClass) return;
+
+      const audioContext =
+        audioContextRef.current ?? new AudioContextClass();
+      audioContextRef.current = audioContext;
+
+      if (audioContext.state === "suspended") {
+        void audioContext.resume();
+      }
+
+      stopRootDrone();
+
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      const now = audioContext.currentTime;
+
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(getNoteFrequency(rootNote, 2), now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.055, now + 0.24);
+
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start(now);
+
+      droneOscillatorRef.current = oscillator;
+      droneGainRef.current = gain;
+    },
+    [stopRootDrone]
   );
 
   function resetBeat() {
@@ -1246,6 +1319,25 @@ useEffect(() => {
   voicingMode,
 ]);
 
+useEffect(() => {
+  if (!rootDroneEnabled || !practiceMode || !currentDroneRoot) {
+    stopRootDrone();
+    return;
+  }
+
+  startRootDrone(currentDroneRoot);
+
+  return () => {
+    stopRootDrone();
+  };
+}, [
+  currentDroneRoot,
+  practiceMode,
+  rootDroneEnabled,
+  startRootDrone,
+  stopRootDrone,
+]);
+
   useEffect(() => {
     if (countInRemaining === null) return;
 
@@ -1504,6 +1596,7 @@ useEffect(() => {
               safeBeatsPerChord={safeBeatsPerChord}
               isAutoPlaying={isAutoPlaying}
               metronomeEnabled={metronomeEnabled}
+              rootDroneEnabled={rootDroneEnabled}
               countInEnabled={countInEnabled}
               countInRemaining={countInRemaining}
               currentVoicings={currentVoicings}
@@ -1656,6 +1749,11 @@ useEffect(() => {
               active={metronomeEnabled}
               label="메트로놈"
               onClick={() => setMetronomeEnabled((prev) => !prev)}
+            />
+            <TogglePill
+              active={rootDroneEnabled}
+              label="루트 드론"
+              onClick={() => setRootDroneEnabled((prev) => !prev)}
             />
             <TogglePill
               active={countInEnabled}
@@ -2713,6 +2811,7 @@ function PracticePanel({
   safeBeatsPerChord,
   isAutoPlaying,
   metronomeEnabled,
+  rootDroneEnabled,
   countInEnabled,
   countInRemaining,
   currentVoicings,
@@ -2740,6 +2839,7 @@ function PracticePanel({
   safeBeatsPerChord: number;
   isAutoPlaying: boolean;
   metronomeEnabled: boolean;
+  rootDroneEnabled: boolean;
   countInEnabled: boolean;
   countInRemaining: number | null;
   currentVoicings: GuitarVoicing[];
@@ -2802,20 +2902,25 @@ function PracticePanel({
             selectedKeyRoot={selectedKeyRoot}
             soloScaleNotes={soloScaleNotes}
             currentIndex={currentIndex}
+            compact
           />
         ) : bestVoicingPair ? (
-          <section className="mt-5 grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
-            <PracticeVoicingCard
-              label="지금"
-              symbol={currentPracticeItem.symbol}
-              voicing={bestVoicingPair.currentVoicing}
-            />
-            <div className="text-center text-2xl font-black text-[#64748B]">→</div>
-            <PracticeVoicingCard
-              label="다음"
-              symbol={nextPracticeItem?.symbol ?? "-"}
-              voicing={bestVoicingPair.nextVoicing}
-            />
+          <section className="mt-5">
+            <div className="mx-auto grid max-w-[760px] gap-4 md:grid-cols-[1fr_auto_1fr] md:items-center">
+              <PracticeVoicingCard
+                label="지금"
+                symbol={currentPracticeItem.symbol}
+                voicing={bestVoicingPair.currentVoicing}
+                compact
+              />
+              <div className="text-center text-2xl font-black text-[#64748B]">→</div>
+              <PracticeVoicingCard
+                label="다음"
+                symbol={nextPracticeItem?.symbol ?? "-"}
+                voicing={bestVoicingPair.nextVoicing}
+                compact
+              />
+            </div>
           </section>
         ) : null}
 
@@ -2884,8 +2989,8 @@ function PracticePanel({
             <PracticeMiniCard
               title="클릭"
               value={`${metronomeEnabled ? "메트로놈 ON" : "메트로놈 OFF"} / ${
-                countInEnabled ? "카운트인 ON" : "카운트인 OFF"
-              }`}
+                rootDroneEnabled ? "드론 ON" : "드론 OFF"
+              } / ${countInEnabled ? "카운트인 ON" : "카운트인 OFF"}`}
             />
             {viewMode !== "minimal" && (
               <PracticeMiniCard title="기능" value={currentPracticeItem.functionName} />
@@ -2983,12 +3088,14 @@ function SoloPracticePanel({
   selectedKeyRoot,
   soloScaleNotes,
   currentIndex,
+  compact = false,
 }: {
   currentPracticeItem: PracticeItem;
   nextPracticeItem: PracticeItem | undefined;
   selectedKeyRoot: string;
   soloScaleNotes: string[];
   currentIndex: number;
+  compact?: boolean;
 }) {
   const chordTones =
     currentPracticeItem.notes.length > 0
@@ -3033,14 +3140,21 @@ function SoloPracticePanel({
         <PracticeMiniCard title="프레이즈 제한" value={constraintPrompt} />
       </div>
 
-      <FretboardMap
-        keyRoot={selectedKeyRoot}
-        currentChordSymbol={currentPracticeItem.symbol}
-        currentChordNotes={chordTones}
-        scaleNotes={soloScaleNotes}
-        targetNotes={[targetNote]}
-        mode="solo"
-      />
+      {compact ? (
+        <p className="mt-4 rounded-lg border border-blue-900/30 bg-[#050B16] p-3 text-sm font-bold leading-6 text-[#94A3B8]">
+          Focus mode keeps the full fretboard folded so the target note and
+          landing note stay readable at a glance.
+        </p>
+      ) : (
+        <FretboardMap
+          keyRoot={selectedKeyRoot}
+          currentChordSymbol={currentPracticeItem.symbol}
+          currentChordNotes={chordTones}
+          scaleNotes={soloScaleNotes}
+          targetNotes={[targetNote]}
+          mode="solo"
+        />
+      )}
     </section>
   );
 }
@@ -3091,10 +3205,9 @@ function FretboardMap({
     if (targetNotes.some((targetNote) => sameNotePitch(note, targetNote))) {
       return "target";
     }
-    if (sameNotePitch(note, thirdNote) || sameNotePitch(note, seventhNote)) {
-      return "guide";
-    }
+    if (sameNotePitch(note, thirdNote)) return "third";
     if (sameNotePitch(note, fifthNote)) return "chord";
+    if (sameNotePitch(note, seventhNote)) return "seventh";
     if (currentChordNotes.some((chordNote) => sameNotePitch(note, chordNote))) {
       return "chord";
     }
@@ -3122,7 +3235,7 @@ function FretboardMap({
       };
     }
 
-    if (role === "guide") {
+    if (role === "third" || role === "seventh") {
       return {
         backgroundColor: GUIDE_TONE_COLOR,
         borderColor: "rgba(30, 64, 175, 0.5)",
@@ -3153,6 +3266,17 @@ function FretboardMap({
     };
   }
 
+  function getRoleLabel(role: string, note: string) {
+    if (role === "root") return "R";
+    if (role === "target") return "T";
+    if (role === "third") return "3";
+    if (role === "chord" && sameNotePitch(note, fifthNote)) return "5";
+    if (role === "seventh") return "7";
+    if (role === "chord") return note;
+    if (role === "scale") return note;
+    return "";
+  }
+
   return (
     <section className="mt-4 rounded-lg border border-blue-900/30 bg-[#050B16] p-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
@@ -3173,6 +3297,9 @@ function FretboardMap({
           </span>
           <span className="rounded-md bg-[#1E40AF] px-2 py-1 text-white">
             3도/7도
+          </span>
+          <span className="rounded-md bg-[#334155] px-2 py-1 text-white">
+            5도
           </span>
         </div>
       </div>
@@ -3207,7 +3334,9 @@ function FretboardMap({
                       style={style}
                       title={`${stringNote} string ${fret} fret: ${note}`}
                     >
-                      {role === "inactive" ? "" : note}
+                      <span className="leading-none">
+                        {getRoleLabel(role, note)}
+                      </span>
                     </div>
                   );
                 })}
@@ -3224,16 +3353,22 @@ function PracticeVoicingCard({
   label,
   symbol,
   voicing,
+  compact = false,
 }: {
   label: string;
   symbol: string;
   voicing: GuitarVoicing;
+  compact?: boolean;
 }) {
   const rootHint = getRootHint(symbol, voicing);
   const guideToneHint = getGuideToneHint(symbol, voicing);
 
   return (
-    <div className="rounded-lg border border-blue-900/30 bg-[#050B16] p-4">
+    <div
+      className={`rounded-lg border border-blue-900/30 bg-[#050B16] p-4 ${
+        compact ? "mx-auto w-full max-w-[340px]" : ""
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-black uppercase text-[#64748B]">{label}</p>
@@ -3245,14 +3380,16 @@ function PracticeVoicingCard({
       </div>
 
       <p className="mt-2 text-sm font-bold text-[#CBD5E1]">{voicing.name}</p>
-      <ChordDiagram symbol={symbol} voicing={voicing} />
+      <ChordDiagram symbol={symbol} voicing={voicing} compact={compact} />
       <div className="mt-3 rounded-lg border border-blue-900/30 bg-[#0A1220] p-3 text-sm leading-6">
         <p className="font-black" style={{ color: ROOT_NOTE_COLOR }}>
           루트: {rootHint}
         </p>
         <p className="text-[#94A3B8]">핵심음: {guideToneHint}</p>
       </div>
-      <p className="mt-2 text-sm leading-6 text-[#64748B]">{voicing.note}</p>
+      {!compact && (
+        <p className="mt-2 text-sm leading-6 text-[#64748B]">{voicing.note}</p>
+      )}
     </div>
   );
 }
@@ -3260,9 +3397,11 @@ function PracticeVoicingCard({
 function ChordDiagram({
   symbol,
   voicing,
+  compact = false,
 }: {
   symbol: string;
   voicing: GuitarVoicing;
+  compact?: boolean;
 }) {
   const frets = parseFretString(voicing.frets).slice(0, 6);
   const pressedFrets = frets.filter(
@@ -3275,6 +3414,14 @@ function ChordDiagram({
   const stringNames = ["E", "A", "D", "G", "B", "E"];
   const rootPositions = getVoicingRootPositions(voicing, symbol);
   const guideToneNotes = getGuideToneNotes(symbol, voicing);
+  const boardHeightClass = compact ? "h-44" : "h-36";
+  const dotSizeClass = compact ? "h-7 w-7 text-xs" : "h-5 w-5 text-[10px]";
+  const topMarkerSizeClass = compact ? "h-7 w-7" : "h-5 w-5";
+  const stringRailInset = `${100 / 12}%`;
+
+  function getStringCenter(stringIndex: number) {
+    return `${((stringIndex + 0.5) / 6) * 100}%`;
+  }
 
   function getMarkerRole(stringIndex: number, fret: number) {
     const note = getStringNoteAtFret(stringIndex, fret);
@@ -3296,54 +3443,64 @@ function ChordDiagram({
       className="mt-3 rounded-lg border border-blue-900/30 bg-[#02040A] p-3"
       aria-label={`${voicing.name} 기타 코드 다이어그램`}
     >
-      <div className="grid grid-cols-6 text-center text-xs font-black text-[#64748B]">
-        {frets.map((fret, index) => {
-          const role = fret === 0 ? getMarkerRole(index, 0) : "inactive";
+      <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-3">
+        <span />
+        <div className="grid grid-cols-6 text-center text-xs font-black text-[#64748B]">
+          {frets.map((fret, index) => {
+            const role = fret === 0 ? getMarkerRole(index, 0) : "inactive";
 
-          return (
-            <span
-              key={`${voicing.name}-status-${index}`}
-              className={`mx-auto flex h-5 w-5 items-center justify-center rounded-full ${
-                role === "root"
-                  ? "text-[#02040A] shadow-[0_0_16px_rgba(245,158,11,0.24)]"
-                  : role === "guide"
-                    ? "bg-[#1E40AF] text-white"
-                    : ""
-              }`}
-              style={role === "root" ? { backgroundColor: ROOT_NOTE_COLOR } : undefined}
-            >
-              {fret === null ? "x" : fret === 0 ? (role === "root" ? "R" : "o") : ""}
-            </span>
-          );
-        })}
+            return (
+              <span
+                key={`${voicing.name}-status-${index}`}
+                className={`mx-auto flex ${topMarkerSizeClass} items-center justify-center rounded-full ${
+                  role === "root"
+                    ? "text-[#02040A] shadow-[0_0_16px_rgba(245,158,11,0.24)]"
+                    : role === "guide"
+                      ? "bg-[#1E40AF] text-white"
+                      : ""
+                }`}
+                style={role === "root" ? { backgroundColor: ROOT_NOTE_COLOR } : undefined}
+              >
+                {fret === null ? "x" : fret === 0 ? (role === "root" ? "R" : "o") : ""}
+              </span>
+            );
+          })}
+        </div>
       </div>
 
       <div className="mt-2 flex gap-3">
         <div className="w-6 pt-2 text-right text-xs font-bold text-[#64748B]">
           {baseFret > 1 ? `${baseFret}fr` : ""}
         </div>
-        <div className="relative h-36 flex-1">
+        <div className={`relative ${boardHeightClass} flex-1`}>
           {Array.from({ length: 6 }).map((_, index) => (
             <div
               key={`${voicing.name}-string-${index}`}
               className="absolute top-0 bottom-0 w-px bg-[#334155]/70"
-              style={{ left: `${(index / 5) * 100}%` }}
+              style={{ left: getStringCenter(index) }}
             />
           ))}
 
           {visibleFrets.map((fret, index) => (
             <div
               key={`${voicing.name}-fret-${fret}`}
-              className={`absolute left-0 right-0 h-px ${
+              className={`absolute h-px ${
                 index === 0 && baseFret === 1
                   ? "bg-[#94A3B8]"
                   : "bg-[#1E293B]"
               }`}
-              style={{ top: `${(index / 5) * 100}%` }}
+              style={{
+                left: stringRailInset,
+                right: stringRailInset,
+                top: `${(index / 5) * 100}%`,
+              }}
             />
           ))}
 
-          <div className="absolute left-0 right-0 bottom-0 h-px bg-[#1E293B]" />
+          <div
+            className="absolute bottom-0 h-px bg-[#1E293B]"
+            style={{ left: stringRailInset, right: stringRailInset }}
+          />
 
           {frets.map((fret, stringIndex) => {
             if (!fret || fret < baseFret || fret > baseFret + 4) return null;
@@ -3358,7 +3515,7 @@ function ChordDiagram({
             return (
               <span
                 key={`${voicing.name}-marker-${stringIndex}-${fret}`}
-                className={`absolute flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[10px] font-black shadow-sm shadow-black/40 ${
+                className={`absolute flex ${dotSizeClass} -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full font-black shadow-sm shadow-black/40 ${
                   markerRole === "root"
                     ? "text-[#02040A] shadow-[0_0_16px_rgba(245,158,11,0.24)]"
                     : "text-white"
@@ -3367,7 +3524,7 @@ function ChordDiagram({
                   markerRole === "root" ? "루트음" : ""
                 }`}
                 style={{
-                  left: `${(stringIndex / 5) * 100}%`,
+                  left: getStringCenter(stringIndex),
                   top: `${((fret - baseFret + 0.5) / 5) * 100}%`,
                   backgroundColor: markerColor,
                   border:
@@ -3383,10 +3540,13 @@ function ChordDiagram({
         </div>
       </div>
 
-      <div className="mt-2 grid grid-cols-6 pl-9 text-center text-xs font-bold text-[#64748B]">
-        {stringNames.map((stringName, index) => (
-          <span key={`${voicing.name}-string-name-${index}`}>{stringName}</span>
-        ))}
+      <div className="mt-2 grid grid-cols-[1.5rem_minmax(0,1fr)] gap-3">
+        <span />
+        <div className="grid grid-cols-6 text-center text-xs font-bold text-[#64748B]">
+          {stringNames.map((stringName, index) => (
+            <span key={`${voicing.name}-string-name-${index}`}>{stringName}</span>
+          ))}
+        </div>
       </div>
     </div>
   );
