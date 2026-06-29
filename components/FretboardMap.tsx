@@ -128,6 +128,7 @@ export function FretboardStringLane({
   const openNote = getStringNoteAtFret(stringIndex, 0, keyRoot);
   const openRole = getFretRole(openNote);
   const ariaLabel = getOpenAriaLabel(openRole, openNote);
+  const isOpenNoteFeatured = openRole === "root" || openRole === "target";
 
   return (
     <div
@@ -139,17 +140,25 @@ export function FretboardStringLane({
       <span className="whitespace-nowrap">
         {getGuitarStringNumber(stringIndex)} {stringNote}
       </span>
-      <span
-        aria-label={ariaLabel}
-        className={`shrink-0 rounded-full ${
-          openRole === "root"
-            ? "h-3.5 w-3.5 shadow-[0_0_14px_rgba(245,158,11,0.34)]"
-            : openRole === "target"
-              ? "h-3.5 w-3.5 shadow-[0_0_14px_rgba(96,165,250,0.26)]"
-              : "h-2.5 w-2.5"
-        }`}
-        style={getOpenDotStyle(openRole)}
-      />
+      {isOpenNoteFeatured ? (
+        <span
+          aria-label={ariaLabel}
+          className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-black leading-none ${
+            openRole === "root"
+              ? "shadow-[0_0_14px_rgba(245,158,11,0.34)]"
+              : "shadow-[0_0_14px_rgba(96,165,250,0.26)]"
+          }`}
+          style={getOpenDotStyle(openRole)}
+        >
+          {openNote}
+        </span>
+      ) : (
+        <span
+          aria-label={ariaLabel}
+          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          style={getOpenDotStyle(openRole)}
+        />
+      )}
     </div>
   );
 }
@@ -377,8 +386,9 @@ export function FretboardMap({
   }
 
   function getRoleLabel(role: FretRole, note: string) {
-    if (role === "root") return "R";
-    if (role === "target") return "T";
+    if (role === "root" || role === "target") {
+      return formatNoteForKey(note, keyRoot);
+    }
     if (role === "third") return "3";
     if (role === "chord" && sameNotePitch(note, fifthNote)) return "5";
     if (role === "seventh") return "7";
@@ -411,8 +421,12 @@ export function FretboardMap({
   }
 
   function getOpenDotStyle(role: FretRole) {
-    if (role === "root") return { backgroundColor: ROOT_NOTE_ACTIVE_COLOR };
-    if (role === "target") return { backgroundColor: OPEN_TARGET_NOTE_COLOR };
+    if (role === "root") {
+      return { backgroundColor: ROOT_NOTE_ACTIVE_COLOR, color: ROOT_NOTE_DARK };
+    }
+    if (role === "target") {
+      return { backgroundColor: OPEN_TARGET_NOTE_COLOR, color: "#02040A" };
+    }
     if (role === "third" || role === "seventh") {
       return { backgroundColor: GUIDE_TONE_COLOR };
     }
