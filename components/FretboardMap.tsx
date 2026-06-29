@@ -46,7 +46,17 @@ const displayModeLabels: Record<FretboardDisplayMode, string> = {
   guide: "가이드톤",
 };
 
-function getVisibleRole(role: FretRole, displayMode: FretboardDisplayMode) {
+function getVisibleRole({
+  role,
+  note,
+  displayMode,
+  scaleNotes,
+}: {
+  role: FretRole;
+  note: string;
+  displayMode: FretboardDisplayMode;
+  scaleNotes: string[];
+}) {
   if (displayMode === "all") return role;
   if (role === "root") return role;
 
@@ -55,7 +65,10 @@ function getVisibleRole(role: FretRole, displayMode: FretboardDisplayMode) {
   }
 
   if (displayMode === "scale") {
-    return role === "target" || role === "scale" ? role : "inactive";
+    if (role === "target") return role;
+    return scaleNotes.some((scaleNote) => sameNotePitch(scaleNote, note))
+      ? "scale"
+      : "inactive";
   }
 
   if (displayMode === "chord") {
@@ -128,7 +141,7 @@ export function FretboardStringLane({
   const openNote = getStringNoteAtFret(stringIndex, 0, keyRoot);
   const openRole = getFretRole(openNote);
   const ariaLabel = getOpenAriaLabel(openRole, openNote);
-  const isOpenNoteFeatured = openRole === "root" || openRole === "target";
+  const isOpenNoteFeatured = openRole !== "inactive";
 
   return (
     <div
@@ -146,7 +159,9 @@ export function FretboardStringLane({
           className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-black leading-none ${
             openRole === "root"
               ? "shadow-[0_0_14px_rgba(245,158,11,0.34)]"
-              : "shadow-[0_0_14px_rgba(96,165,250,0.26)]"
+              : openRole === "target"
+                ? "shadow-[0_0_14px_rgba(96,165,250,0.26)]"
+                : ""
           }`}
           style={getOpenDotStyle(openRole)}
         >
@@ -245,16 +260,18 @@ export function FretboardLegend({
   targetNotes,
   guideToneNotes,
   currentChordNotes,
+  scaleNotes,
   displayMode,
 }: {
   rootNote: string;
   targetNotes: string[];
   guideToneNotes: string[];
   currentChordNotes: string[];
+  scaleNotes: string[];
   displayMode: FretboardDisplayMode;
 }) {
   return (
-    <div className="mt-4 grid min-w-0 gap-2 rounded-lg border border-blue-950/40 bg-[#02040A] p-3 text-xs font-bold text-[#94A3B8] sm:grid-cols-2 lg:grid-cols-5">
+    <div className="mt-4 grid min-w-0 gap-2 rounded-lg border border-blue-950/40 bg-[#02040A] p-3 text-xs font-bold text-[#94A3B8] sm:grid-cols-2 lg:grid-cols-6">
       <div className="min-w-0 break-words">
         <span className="text-[#64748B]">Root</span>{" "}
         <span className="font-black text-[#FBBF24]">{rootNote}</span>
@@ -275,6 +292,12 @@ export function FretboardLegend({
         <span className="text-[#64748B]">Chord</span>{" "}
         <span className="font-black text-[#CBD5E1]">
           {currentChordNotes.length > 0 ? currentChordNotes.join(", ") : "-"}
+        </span>
+      </div>
+      <div className="min-w-0 break-words">
+        <span className="text-[#64748B]">Scale</span>{" "}
+        <span className="font-black text-[#CBD5E1]">
+          {scaleNotes.length > 0 ? scaleNotes.join(", ") : "-"}
         </span>
       </div>
       <div className="min-w-0 break-words">
@@ -313,6 +336,9 @@ export function FretboardMap({
   const displayedChordNotes = currentChordNotes.map((note) =>
     formatNoteForKey(note, keyRoot)
   );
+  const displayedScaleNotes = scaleNotes.map((note) =>
+    formatNoteForKey(note, keyRoot)
+  );
 
   function getRawFretRole(note: string): FretRole {
     if (sameNotePitch(note, rootNote)) return "root";
@@ -332,7 +358,12 @@ export function FretboardMap({
   }
 
   function getFretRole(note: string): FretRole {
-    return getVisibleRole(getRawFretRole(note), displayMode);
+    return getVisibleRole({
+      role: getRawFretRole(note),
+      note,
+      displayMode,
+      scaleNotes,
+    });
   }
 
   function getRoleStyle(role: FretRole) {
@@ -386,14 +417,7 @@ export function FretboardMap({
   }
 
   function getRoleLabel(role: FretRole, note: string) {
-    if (role === "root" || role === "target") {
-      return formatNoteForKey(note, keyRoot);
-    }
-    if (role === "third") return "3";
-    if (role === "chord" && sameNotePitch(note, fifthNote)) return "5";
-    if (role === "seventh") return "7";
-    if (role === "chord") return "•";
-    return "";
+    return role === "inactive" ? "" : formatNoteForKey(note, keyRoot);
   }
 
   function getOpenLaneStyle(role: FretRole) {
@@ -428,10 +452,14 @@ export function FretboardMap({
       return { backgroundColor: OPEN_TARGET_NOTE_COLOR, color: "#02040A" };
     }
     if (role === "third" || role === "seventh") {
-      return { backgroundColor: GUIDE_TONE_COLOR };
+      return { backgroundColor: GUIDE_TONE_COLOR, color: "#E5E7EB" };
     }
-    if (role === "chord") return { backgroundColor: CHORD_TONE_COLOR };
-    if (role === "scale") return { backgroundColor: SCALE_TONE_COLOR };
+    if (role === "chord") {
+      return { backgroundColor: CHORD_TONE_COLOR, color: "#E5E7EB" };
+    }
+    if (role === "scale") {
+      return { backgroundColor: SCALE_TONE_COLOR, color: "#94A3B8" };
+    }
     return { backgroundColor: "#1E293B" };
   }
 
@@ -502,6 +530,7 @@ export function FretboardMap({
             targetNotes={displayedTargetNotes}
             guideToneNotes={displayedGuideToneNotes}
             currentChordNotes={displayedChordNotes}
+            scaleNotes={displayedScaleNotes}
             displayMode={displayMode}
           />
         </div>
