@@ -10,6 +10,7 @@ import {
   getChordQualityKey,
   getChordTheoryProfile,
 } from "../data/chordTheory";
+import { FretboardMap as SoloFretboardMap } from "../components/FretboardMap";
 import { chordDescriptions } from "../data/chordDescriptions";
 import { getGuitarVoicings, type GuitarVoicing } from "../data/guitarVoicings";
 import { practicePresets, type PracticePreset } from "../data/practicePresets";
@@ -803,6 +804,54 @@ function getSoloTargetRecommendation(
     resolution: resolutionCandidates.join(", ") || root,
     exercise: rhythmPrompt,
   };
+}
+
+function getSoloPracticeBrief({
+  currentItem,
+  nextItem,
+  targetNote,
+  resolution,
+  rhythmPrompt,
+}: {
+  currentItem: PracticeItem;
+  nextItem: PracticeItem | undefined;
+  targetNote: string;
+  resolution: string;
+  rhythmPrompt: string;
+}) {
+  const quality = getChordQualityKey(currentItem.symbol);
+  const nextLabel = nextItem?.symbol ?? "다음 코드";
+  const resolveLabel = resolution || nextItem?.notes[0] || "안정음";
+
+  if (quality === "dominant7") {
+    return [
+      `${targetNote}을 먼저 찾아 도미넌트 긴장 만들기`,
+      "3도 또는 b7을 중심으로 짧게 반복하기",
+      `${nextLabel}에서 ${resolveLabel}로 해결하기`,
+    ];
+  }
+
+  if (quality === "maj7" || quality === "maj9") {
+    return [
+      `루트보다 ${targetNote}을 먼저 들리게 하기`,
+      "긴 음 하나를 남겨 부드럽게 연결하기",
+      `${nextLabel}로 넘어가기 전 7도 색채 유지하기`,
+    ];
+  }
+
+  if (quality === "m7" || quality === "m9" || quality === "m7b5") {
+    return [
+      `${targetNote} 중심으로 마이너 색 잡기`,
+      "짧은 두 마디 프레이즈 하나 만들기",
+      `${nextLabel}의 타겟 노트로 자연스럽게 연결하기`,
+    ];
+  }
+
+  return [
+    `${targetNote}을 첫 착지음으로 정하기`,
+    rhythmPrompt,
+    `${nextLabel}에서 ${resolveLabel} 후보로 마무리하기`,
+  ];
 }
 
 function getMajorScaleNotes(key: string) {
@@ -1813,21 +1862,25 @@ useEffect(() => {
 
           <div className="mt-4 inline-grid rounded-lg border border-blue-900/30 bg-black/25 p-1 sm:grid-cols-2">
             <button
+              type="button"
+              aria-pressed={trainingMode === "chords"}
               onClick={() => updateTrainingMode("chords")}
-              className={`rounded-md px-4 py-2 text-sm font-black transition ${
+              className={`rounded-md px-5 py-3 text-sm font-black transition focus:outline-none focus:ring-2 focus:ring-blue-700/70 ${
                 trainingMode === "chords"
-                  ? "bg-[#1E40AF] text-white"
-                  : "text-slate-400 hover:text-[#CBD5E1]"
+                  ? "bg-[#1E40AF] text-white shadow-sm shadow-black/30"
+                  : "bg-[#07111F] text-slate-400 hover:bg-[#0B1730] hover:text-[#CBD5E1]"
               }`}
             >
               코드 진행
             </button>
             <button
+              type="button"
+              aria-pressed={trainingMode === "solo"}
               onClick={() => updateTrainingMode("solo")}
-              className={`rounded-md px-4 py-2 text-sm font-black transition ${
+              className={`rounded-md px-5 py-3 text-sm font-black transition focus:outline-none focus:ring-2 focus:ring-blue-700/70 ${
                 trainingMode === "solo"
-                  ? "bg-[#1E40AF] text-white"
-                  : "text-slate-400 hover:text-[#CBD5E1]"
+                  ? "bg-[#1E40AF] text-white shadow-sm shadow-black/30"
+                  : "bg-[#07111F] text-slate-400 hover:bg-[#0B1730] hover:text-[#CBD5E1]"
               }`}
             >
               즉흥 솔로
@@ -3634,6 +3687,13 @@ function SoloPracticePanel({
   const targetNotes = soloRecommendation.alternateTargets.length
     ? soloRecommendation.alternateTargets
     : [soloRecommendation.targetNote];
+  const practiceBrief = getSoloPracticeBrief({
+    currentItem: currentPracticeItem,
+    nextItem: nextPracticeItem,
+    targetNote: soloRecommendation.targetNote,
+    resolution: soloRecommendation.resolution,
+    rhythmPrompt,
+  });
 
   return (
     <section className="min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-black/25 p-4">
@@ -3685,13 +3745,34 @@ function SoloPracticePanel({
         </div>
       </div>
 
+      <div className="mt-4 min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#050B16] p-3">
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-[#64748B]">
+          Practice Brief
+        </p>
+        <div className="mt-3 grid min-w-0 gap-2 md:grid-cols-3">
+          {practiceBrief.map((step, index) => (
+            <div
+              key={`${currentPracticeItem.symbol}-brief-${index}`}
+              className="min-w-0 rounded-md border border-blue-900/30 bg-[#0A1220] p-3"
+            >
+              <p className="text-xs font-black text-[#64748B]">
+                STEP {index + 1}
+              </p>
+              <p className="mt-1 break-words text-sm font-black leading-6 text-[#CBD5E1]">
+                {step}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {compact ? (
         <p className="mt-4 break-words rounded-lg border border-blue-900/30 bg-[#050B16] p-3 text-sm font-bold leading-6 text-[#94A3B8]">
           집중모드에서는 큰 프렛보드 맵을 접고 타겟 노트와 해결 후보만
           빠르게 확인합니다.
         </p>
       ) : (
-        <FretboardMap
+        <SoloFretboardMap
           keyRoot={selectedKeyRoot}
           currentChordSymbol={currentPracticeItem.symbol}
           currentChordNotes={chordTones}
@@ -3908,6 +3989,8 @@ function FretboardLegend({
   );
 }
 
+// Legacy fallback kept temporarily while the active fretboard lives in components/FretboardMap.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function FretboardMap({
   keyRoot,
   currentChordSymbol,
