@@ -1763,10 +1763,10 @@ useEffect(() => {
 ]);
 
   return (
-    <main className="min-h-screen bg-[#02040A] text-[#E5E7EB]">
+    <main className="min-h-screen overflow-x-hidden bg-[#02040A] text-[#E5E7EB]">
       <div className="fixed inset-0 -z-10 bg-[linear-gradient(145deg,_#02040A,_#030712_46%,_#081426)]" />
 
-      <section className="mx-auto max-w-6xl space-y-5 px-4 py-5 md:px-6">
+      <section className="mx-auto w-full max-w-[1500px] space-y-5 overflow-hidden px-4 py-5 md:px-6">
         <header className="border-b border-blue-900/30 pb-4">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
@@ -2701,7 +2701,7 @@ useEffect(() => {
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-blue-900/30 bg-[#07111F]/95 p-5 shadow-xl shadow-black/25 backdrop-blur">
+    <section className="min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#07111F]/95 p-5 shadow-xl shadow-black/25 backdrop-blur">
       {children}
     </section>
   );
@@ -3192,13 +3192,13 @@ function PracticePanel({
 
   if (focusMode) {
     return (
-      <section className="mt-5 rounded-lg border border-blue-900/30 bg-[#050B16] p-5 shadow-2xl shadow-black/30">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
+      <section className="mt-5 min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#050B16] p-5 shadow-2xl shadow-black/30">
+        <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0">
             <p className="text-xs font-black uppercase text-[#64748B]">
               {trainingMode === "solo" ? "Focus Solo" : "Focus Practice"}
             </p>
-            <h2 className="text-6xl font-black tracking-tight text-white md:text-8xl">
+            <h2 className="break-words text-6xl font-black tracking-tight text-white md:text-8xl">
               {currentPracticeItem.symbol}
             </h2>
             <p className="mt-1 text-xl font-black text-[#94A3B8]">
@@ -3244,11 +3244,10 @@ function PracticePanel({
             selectedKeyRoot={selectedKeyRoot}
             soloScaleNotes={soloScaleNotes}
             currentIndex={currentIndex}
-            compact
           />
         ) : bestVoicingPair ? (
-          <section className="mt-5">
-            <div className="mx-auto grid max-w-[760px] gap-4 md:grid-cols-[1fr_auto_1fr] md:items-center">
+          <section className="mt-5 min-w-0">
+            <div className="mx-auto grid max-w-[760px] gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center">
               <PracticeVoicingCard
                 label="지금"
                 symbol={currentPracticeItem.symbol}
@@ -3284,23 +3283,53 @@ function PracticePanel({
   }
 
   return (
-    <section className="mt-5 rounded-lg border border-blue-900/30 bg-[#050B16] p-4 shadow-2xl shadow-black/25">
-      <div className="grid gap-4 lg:grid-cols-[0.78fr_1.22fr] lg:items-stretch">
-        <div className="rounded-lg border border-blue-900/30 bg-[#0A1220] p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
+    <section className="mt-5 min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#050B16] p-4 shadow-2xl shadow-black/25">
+      <div
+        className={`grid min-w-0 gap-4 lg:items-stretch ${
+          trainingMode === "solo"
+            ? "xl:grid-cols-[160px_minmax(0,1fr)]"
+            : "lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]"
+        }`}
+      >
+        <div
+          className={`min-w-0 rounded-lg border border-blue-900/30 bg-[#0A1220] ${
+            trainingMode === "solo" ? "p-3" : "p-4"
+          }`}
+        >
+          <div
+            className={`flex min-w-0 gap-3 ${
+              trainingMode === "solo"
+                ? "flex-row items-start justify-between xl:flex-col xl:justify-start"
+                : "items-start justify-between"
+            }`}
+          >
+            <div className="min-w-0">
               <p className="text-xs font-black uppercase text-[#64748B]">
                 {trainingMode === "solo" ? "Solo Practice" : "Now Playing"}
               </p>
-              <h2 className="mt-1 text-5xl font-black tracking-tight text-white md:text-6xl">
+              <h2
+                className={`mt-1 break-words font-black tracking-tight text-white ${
+                  trainingMode === "solo"
+                    ? "text-4xl xl:text-3xl"
+                    : "text-5xl md:text-6xl"
+                }`}
+              >
                 {currentPracticeItem.symbol}
               </h2>
-              <p className="mt-1 text-lg font-black text-[#94A3B8]">
+              <p
+                className={`mt-1 break-words font-black text-[#94A3B8] ${
+                  trainingMode === "solo" ? "text-sm" : "text-lg"
+                }`}
+              >
                 {selectedKey} / {safeBpm} BPM
               </p>
             </div>
 
-            <div className="text-right">
+            <div
+              className={`shrink-0 ${
+                trainingMode === "solo" ? "text-right xl:text-left" : "text-right"
+              }`}
+            >
               <p className="text-sm font-black text-[#94A3B8]">
                 {currentIndex + 1} / {totalCount}
               </p>
@@ -3319,19 +3348,25 @@ function PracticePanel({
             safeBeatsPerChord={safeBeatsPerChord}
           />
 
-          <PlaybackStatusCard
-            safeBpm={safeBpm}
-            beatInChord={beatInChord}
-            safeBeatsPerChord={safeBeatsPerChord}
-            currentIndex={currentIndex}
-            totalCount={totalCount}
-            isAutoPlaying={isAutoPlaying}
-            countInEnabled={countInEnabled}
-            countInRemaining={countInRemaining}
-            compact
-          />
+          {trainingMode !== "solo" && (
+            <PlaybackStatusCard
+              safeBpm={safeBpm}
+              beatInChord={beatInChord}
+              safeBeatsPerChord={safeBeatsPerChord}
+              currentIndex={currentIndex}
+              totalCount={totalCount}
+              isAutoPlaying={isAutoPlaying}
+              countInEnabled={countInEnabled}
+              countInRemaining={countInRemaining}
+              compact
+            />
+          )}
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+          <div
+            className={`mt-4 grid min-w-0 gap-3 ${
+              trainingMode === "solo" ? "sm:grid-cols-2 xl:grid-cols-1" : "sm:grid-cols-2 lg:grid-cols-1"
+            }`}
+          >
             <PracticeMiniCard title="BPM / 박자" value={`${safeBpm} / ${safeBeatsPerChord}`} />
             <PracticeMiniCard title="다음 코드" value={nextPracticeItem?.symbol ?? "-"} />
             <PracticeMiniCard
@@ -3372,7 +3407,7 @@ function PracticePanel({
             currentIndex={currentIndex}
           />
         ) : bestVoicingPair ? (
-          <section className="rounded-lg border border-blue-900/30 bg-[#0A1220] p-4">
+          <section className="min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#0A1220] p-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-xs font-black uppercase text-[#64748B]">
@@ -3388,7 +3423,7 @@ function PracticePanel({
               </span>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
+            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center">
               <PracticeVoicingCard
                 label="현재"
                 symbol={currentPracticeItem.symbol}
@@ -3430,9 +3465,9 @@ function PracticePanel({
 
 function PracticeMiniCard({ title, value }: { title: string; value: string }) {
   return (
-    <div className="rounded-lg border border-blue-900/30 bg-[#050B16] p-3">
-      <p className="text-sm font-bold text-slate-400">{title}</p>
-      <p className="mt-1 break-words text-base font-black text-white">
+    <div className="min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#050B16] p-3">
+      <p className="break-words text-sm font-bold text-slate-400">{title}</p>
+      <p className="mt-1 whitespace-normal break-words text-base font-black text-white">
         {value}
       </p>
     </div>
@@ -3601,57 +3636,57 @@ function SoloPracticePanel({
     : [soloRecommendation.targetNote];
 
   return (
-    <section className="rounded-lg border border-blue-900/30 bg-black/25 p-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
+    <section className="min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-black/25 p-4">
+      <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
           <p className="text-xs font-black uppercase text-[#64748B]">
             Solo Map
           </p>
-          <h3 className="mt-1 text-xl font-black text-white">
+          <h3 className="mt-1 break-words text-xl font-black text-white">
             {selectedKeyRoot} major 즉흥 솔로
           </h3>
         </div>
-        <span className="rounded-lg bg-[#1E40AF] px-3 py-2 text-sm font-black text-white">
+        <span className="max-w-full break-words rounded-lg bg-[#1E40AF] px-3 py-2 text-sm font-black text-white">
           목표음 {soloRecommendation.targetNote}
         </span>
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
+      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
         <SoloInfoBlock title="스케일" notes={soloScaleNotes} />
         <SoloInfoBlock title="현재 코드톤" notes={chordTones} />
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
+      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <PracticeMiniCard title="현재 코드" value={currentPracticeItem.symbol} />
         <PracticeMiniCard title="타겟 노트" value={soloRecommendation.targetNote} />
         <PracticeMiniCard title="해결 후보" value={soloRecommendation.resolution} />
         <PracticeMiniCard title="추천 이유" value={soloRecommendation.reason} />
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
+      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
         <PracticeMiniCard title="리듬 제한" value={rhythmPrompt} />
         <PracticeMiniCard title="연습 과제" value={soloRecommendation.exercise} />
       </div>
 
-      <div className="mt-4 rounded-lg border border-blue-900/30 bg-[#0A1220] p-3">
+      <div className="mt-4 min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#0A1220] p-3">
         <p className="text-xs font-black uppercase text-[#64748B]">
           Solo Mission
         </p>
-        <div className="mt-3 grid gap-2 text-sm font-black leading-6">
-          <p className="text-[#CBD5E1]">
+        <div className="mt-3 grid min-w-0 gap-2 text-sm font-black leading-6">
+          <p className="break-words text-[#CBD5E1]">
             타겟{" "}
             <span style={{ color: ROOT_NOTE_COLOR }}>
               {soloRecommendation.targetNote}
             </span>
           </p>
-          <p className="text-[#94A3B8]">접근: {soloApproach}</p>
-          <p className="text-[#94A3B8]">해결: {soloResolution}</p>
-          <p className="text-[#94A3B8]">리듬: {rhythmPrompt}</p>
+          <p className="break-words text-[#94A3B8]">접근: {soloApproach}</p>
+          <p className="break-words text-[#94A3B8]">해결: {soloResolution}</p>
+          <p className="break-words text-[#94A3B8]">리듬: {rhythmPrompt}</p>
         </div>
       </div>
 
       {compact ? (
-        <p className="mt-4 rounded-lg border border-blue-900/30 bg-[#050B16] p-3 text-sm font-bold leading-6 text-[#94A3B8]">
+        <p className="mt-4 break-words rounded-lg border border-blue-900/30 bg-[#050B16] p-3 text-sm font-bold leading-6 text-[#94A3B8]">
           집중모드에서는 큰 프렛보드 맵을 접고 타겟 노트와 해결 후보만
           빠르게 확인합니다.
         </p>
@@ -3671,13 +3706,13 @@ function SoloPracticePanel({
 
 function SoloInfoBlock({ title, notes }: { title: string; notes: string[] }) {
   return (
-    <div className="rounded-lg border border-blue-900/30 bg-[#07111F] p-3">
-      <p className="text-sm font-bold text-slate-400">{title}</p>
-      <div className="mt-2 flex flex-wrap gap-2">
+    <div className="min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#07111F] p-3">
+      <p className="break-words text-sm font-bold text-slate-400">{title}</p>
+      <div className="mt-2 flex min-w-0 flex-wrap gap-2">
         {notes.map((note) => (
           <span
             key={`${title}-${note}`}
-            className="rounded-md border border-blue-900/30 bg-[#0B1730] px-2 py-1 text-sm font-black text-[#CBD5E1]"
+            className="max-w-full break-words rounded-md border border-blue-900/30 bg-[#0B1730] px-2 py-1 text-sm font-black text-[#CBD5E1]"
           >
             {note}
           </span>
@@ -3736,7 +3771,7 @@ function FretboardStringLane({
 
   return (
     <div
-      className={`flex h-9 items-center justify-between gap-2 rounded-md border px-2 text-xs font-black ${getOpenLaneStyle(
+      className={`flex h-8 min-w-0 items-center justify-between gap-1.5 rounded-md border px-1.5 text-xs font-black ${getOpenLaneStyle(
         openRole
       )}`}
       title={ariaLabel}
@@ -3780,7 +3815,7 @@ function FretGrid({
 }) {
   return (
     <>
-      <div className="grid grid-cols-[82px_repeat(12,_minmax(58px,_1fr))] gap-2 text-center text-xs font-black text-[#64748B]">
+      <div className="grid min-w-0 grid-cols-[64px_repeat(12,_minmax(44px,_1fr))] gap-1.5 text-center text-xs font-black text-[#64748B]">
         <span />
         {frets.map((fret) => (
           <span
@@ -3792,11 +3827,11 @@ function FretGrid({
         ))}
       </div>
 
-      <div className="mt-2 space-y-2">
+      <div className="mt-1.5 min-w-0 space-y-1.5">
         {standardTuningNotes.map((stringNote, stringIndex) => (
           <div
             key={`${mode}-${stringNote}-${stringIndex}`}
-            className="grid grid-cols-[82px_repeat(12,_minmax(58px,_1fr))] gap-2"
+            className="grid min-w-0 grid-cols-[64px_repeat(12,_minmax(44px,_1fr))] gap-1.5"
           >
             <FretboardStringLane
               stringNote={stringNote}
@@ -3815,7 +3850,7 @@ function FretGrid({
               return (
                 <div
                   key={`${stringIndex}-${fret}`}
-                  className="flex h-9 items-center justify-center rounded-md border text-xs font-black"
+                  className="flex h-8 items-center justify-center rounded-md border text-xs font-black"
                   style={style}
                   title={`${getGuitarStringNumber(
                     stringIndex
@@ -3846,24 +3881,24 @@ function FretboardLegend({
   currentChordNotes: string[];
 }) {
   return (
-    <div className="mt-4 grid gap-2 rounded-lg border border-blue-950/40 bg-[#02040A] p-3 text-xs font-bold text-[#94A3B8] sm:grid-cols-2 lg:grid-cols-4">
-      <div>
+    <div className="mt-4 grid min-w-0 gap-2 rounded-lg border border-blue-950/40 bg-[#02040A] p-3 text-xs font-bold text-[#94A3B8] sm:grid-cols-2 lg:grid-cols-4">
+      <div className="min-w-0 break-words">
         <span className="text-[#64748B]">Root</span>{" "}
         <span className="font-black text-[#FBBF24]">{rootNote}</span>
       </div>
-      <div>
+      <div className="min-w-0 break-words">
         <span className="text-[#64748B]">Target</span>{" "}
         <span className="font-black text-[#CBD5E1]">
           {targetNotes.length > 0 ? targetNotes.join(", ") : "-"}
         </span>
       </div>
-      <div>
+      <div className="min-w-0 break-words">
         <span className="text-[#64748B]">Guide</span>{" "}
         <span className="font-black text-[#CBD5E1]">
           {guideToneNotes.length > 0 ? guideToneNotes.join(", ") : "-"}
         </span>
       </div>
-      <div>
+      <div className="min-w-0 break-words">
         <span className="text-[#64748B]">Chord</span>{" "}
         <span className="font-black text-[#CBD5E1]">
           {currentChordNotes.length > 0 ? currentChordNotes.join(", ") : "-"}
@@ -4019,9 +4054,9 @@ function FretboardMap({
   }
 
   return (
-    <section className="mt-4 rounded-lg border border-blue-900/30 bg-[#050B16] p-4 sm:p-5">
-      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-        <div>
+    <section className="mt-4 min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#050B16] p-4 sm:p-5">
+      <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div className="min-w-0">
           <p className="text-xs font-black uppercase text-[#64748B]">
             Fretboard Map
           </p>
@@ -4029,7 +4064,7 @@ function FretboardMap({
             {keyRoot} major / {currentChordSymbol}
           </h4>
         </div>
-        <div className="flex flex-wrap gap-2 text-xs font-bold">
+        <div className="flex min-w-0 flex-wrap gap-2 text-xs font-bold">
           <span className="rounded-md px-2 py-1" style={{ backgroundColor: ROOT_NOTE_COLOR, color: ROOT_NOTE_DARK }}>
             Root
           </span>
@@ -4045,8 +4080,8 @@ function FretboardMap({
         </div>
       </div>
 
-      <div className="mt-4 overflow-x-auto pb-2">
-        <div className="min-w-[920px]">
+      <div className="mt-4 w-full min-w-0 overflow-x-auto pb-2 xl:overflow-x-visible">
+        <div className="min-w-[720px] max-w-none xl:min-w-0 xl:w-full">
           <FretGrid
             frets={frets}
             keyRoot={keyRoot}
