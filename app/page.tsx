@@ -14,6 +14,12 @@ import { chordDescriptions } from "../data/chordDescriptions";
 import { getGuitarVoicings, type GuitarVoicing } from "../data/guitarVoicings";
 import { practicePresets, type PracticePreset } from "../data/practicePresets";
 import { getRecommendedScaleProfilesForChord } from "../data/scaleTheory";
+import {
+  areSamePitch as areSamePitchClass,
+  getNoteNameAtFret,
+  getNoteNamePreference,
+  getPitchClass,
+} from "../lib/musicNotes";
 
 type VoicingMode = "all" | "easy" | "open" | "barre" | "upper" | "neo";
 
@@ -200,13 +206,7 @@ const flatNotes = [
 ];
 
 function getNoteIndex(note: string) {
-  const sharpIndex = sharpNotes.indexOf(note);
-  if (sharpIndex !== -1) return sharpIndex;
-
-  const flatIndex = flatNotes.indexOf(note);
-  if (flatIndex !== -1) return flatIndex;
-
-  return 0;
+  return getPitchClass(note);
 }
 
 function getOutputNoteNames(key: string) {
@@ -309,6 +309,11 @@ type VoicingPair = {
   nextVoicing: GuitarVoicing;
   distance: number;
 };
+type VoicingFallbackResult = {
+  voicings: GuitarVoicing[];
+  usedMode: VoicingMode | "none";
+  fallbackMessage?: string;
+};
 
 const majorScaleSteps = [0, 2, 4, 5, 7, 9, 11];
 const standardTuningNotes = ["E", "A", "D", "G", "B", "E"];
@@ -358,6 +363,12 @@ function filterVoicingsByMode(voicings: GuitarVoicing[], mode: VoicingMode) {
   if (mode === "all") return voicings;
 
   return voicings.filter((voicing) => {
+    if (mode === "easy" && voicing.tags?.includes("easy")) return true;
+    if (mode === "open" && voicing.tags?.includes("open")) return true;
+    if (mode === "barre" && voicing.tags?.includes("barre")) return true;
+    if (mode === "upper" && voicing.tags?.includes("upper")) return true;
+    if (mode === "neo" && voicing.tags?.includes("neo")) return true;
+
     const text = `${voicing.name} ${voicing.note} ${voicing.frets}`.toLowerCase();
 
     if (mode === "easy") {
@@ -395,6 +406,56 @@ function filterVoicingsByMode(voicings: GuitarVoicing[], mode: VoicingMode) {
   });
 }
 
+function getVoicingsWithFallback(
+  chordSymbol: string | undefined,
+  mode: VoicingMode
+): VoicingFallbackResult {
+  if (!chordSymbol) {
+    return {
+      voicings: [],
+      usedMode: "none",
+      fallbackMessage: "보이싱 미등록",
+    };
+  }
+
+  const allVoicings = getGuitarVoicings(chordSymbol);
+
+  if (allVoicings.length === 0) {
+    return {
+      voicings: [],
+      usedMode: "none",
+      fallbackMessage: "보이싱 미등록",
+    };
+  }
+
+  const selectedVoicings = filterVoicingsByMode(allVoicings, mode);
+  if (selectedVoicings.length > 0) {
+    return { voicings: selectedVoicings, usedMode: mode };
+  }
+
+  const fallbackModes: VoicingMode[] = ["easy", "open", "all"];
+  for (const fallbackMode of fallbackModes) {
+    const fallbackVoicings =
+      fallbackMode === "all"
+        ? allVoicings
+        : filterVoicingsByMode(allVoicings, fallbackMode);
+
+    if (fallbackVoicings.length > 0) {
+      return {
+        voicings: fallbackVoicings,
+        usedMode: fallbackMode,
+        fallbackMessage: `${voicingModeLabels[mode]} 없음 · ${voicingModeLabels[fallbackMode]}로 표시`,
+      };
+    }
+  }
+
+  return {
+    voicings: allVoicings,
+    usedMode: "all",
+    fallbackMessage: `${voicingModeLabels[mode]} 없음 · 전체 보이싱에서 추천`,
+  };
+}
+
 function parseFretString(frets: string) {
   return frets.split("").map((char) => {
     if (char.toLowerCase() === "x") return null;
@@ -428,13 +489,12 @@ function getChordRootSymbol(symbol: string) {
 }
 
 function sameNotePitch(noteA?: string, noteB?: string) {
-  if (!noteA || !noteB) return false;
-  return getNoteIndex(noteA) === getNoteIndex(noteB);
+  return areSamePitchClass(noteA, noteB);
 }
 
-function getStringNoteAtFret(stringIndex: number, fret: number) {
+function getStringNoteAtFret(stringIndex: number, fret: number, keyRoot = "C") {
   const openNote = standardTuningNotes[stringIndex] ?? "E";
-  return sharpNotes[(getNoteIndex(openNote) + fret) % 12];
+  return getNoteNameAtFret(openNote, fret, getNoteNamePreference(keyRoot));
 }
 
 function getGuitarStringNumber(stringIndex: number) {
@@ -488,7 +548,9 @@ function getVoicingRootPositions(
         {
           stringIndex,
           fret: voicing.rootFret,
-          note: voicing.rootNote ?? getStringNoteAtFret(stringIndex, voicing.rootFret),
+          note:
+            voicing.rootNote ??
+            getStringNoteAtFret(stringIndex, voicing.rootFret, rootNote),
         },
       ];
     }
@@ -498,7 +560,7 @@ function getVoicingRootPositions(
     .map((fret, stringIndex) => {
       if (fret === null) return null;
 
-      const note = getStringNoteAtFret(stringIndex, fret);
+      const note = getStringNoteAtFret(stringIndex, fret, rootNote);
 
       if (!sameNotePitch(note, rootNote)) return null;
 
@@ -635,7 +697,11 @@ function getEnhancedFocusMovementHint(
   const commonTone = currentFrets
     .map((fret, stringIndex) => {
       if (fret === null || nextFrets[stringIndex] !== fret) return null;
-      return getStringNoteAtFret(stringIndex, fret);
+      return getStringNoteAtFret(
+        stringIndex,
+        fret,
+        pair.currentVoicing.rootNote ?? getChordRootSymbol(currentSymbol)
+      );
     })
     .find((note): note is string => Boolean(note));
   const currentRoot = pair.currentVoicing.rootNote ?? getChordRootSymbol(currentSymbol);
@@ -976,25 +1042,29 @@ const [favoriteTitleInput, setFavoriteTitleInput] = useState("");
   const description = chordDescriptions[cleanInput];
 
   const progressionAnalysis = analyzeProgression(progressionInput, analysisKey);
-  const currentPracticeItem = progressionAnalysis.items[currentIndex];
+  const itemCount = progressionAnalysis.items.length;
+  const safeCurrentIndex =
+    itemCount > 0 ? ((currentIndex % itemCount) + itemCount) % itemCount : 0;
+  const currentPracticeItem = progressionAnalysis.items[safeCurrentIndex];
 
   const nextPracticeItem =
-    progressionAnalysis.items.length > 0
-      ? progressionAnalysis.items[
-          (currentIndex + 1) % progressionAnalysis.items.length
-        ]
+    itemCount > 0
+      ? progressionAnalysis.items[(safeCurrentIndex + 1) % itemCount]
       : undefined;
 
-  const rawCurrentVoicings = currentPracticeItem
-    ? getGuitarVoicings(currentPracticeItem.symbol)
-    : [];
-
-  const rawNextVoicings = nextPracticeItem
-    ? getGuitarVoicings(nextPracticeItem.symbol)
-    : [];
-
-  const currentVoicings = filterVoicingsByMode(rawCurrentVoicings, voicingMode);
-  const nextVoicings = filterVoicingsByMode(rawNextVoicings, voicingMode);
+  const currentVoicingResult = getVoicingsWithFallback(
+    currentPracticeItem?.symbol,
+    voicingMode
+  );
+  const nextVoicingResult = getVoicingsWithFallback(
+    nextPracticeItem?.symbol,
+    voicingMode
+  );
+  const currentVoicings = currentVoicingResult.voicings;
+  const nextVoicings = nextVoicingResult.voicings;
+  const voicingFallbackMessage =
+    currentVoicingResult.fallbackMessage ??
+    nextVoicingResult.fallbackMessage;
 
   const bestVoicingPair = getBestVoicingPair(currentVoicings, nextVoicings);
   const selectedKeyRoot = progressionAnalysis.selectedKeyRoot;
@@ -1051,6 +1121,22 @@ const [favoriteTitleInput, setFavoriteTitleInput] = useState("");
     },
     [metronomeEnabled]
   );
+
+  useEffect(() => {
+    const nextIndex =
+      itemCount === 0 ? 0 : Math.min(currentIndex, itemCount - 1);
+
+    if (nextIndex === currentIndex) return;
+
+    const timer = window.setTimeout(() => {
+      setCurrentIndex(nextIndex);
+      setBeatInChord(1);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [currentIndex, itemCount]);
 
   const stopRootDrone = React.useCallback(() => {
     const oscillator = droneOscillatorRef.current;
@@ -1749,7 +1835,7 @@ useEffect(() => {
               nextPracticeItem={nextPracticeItem}
               trainingMode={trainingMode}
               viewMode={viewMode}
-              currentIndex={currentIndex}
+              currentIndex={safeCurrentIndex}
               totalCount={progressionAnalysis.items.length}
               selectedKey={progressionAnalysis.selectedKey}
               selectedKeyRoot={selectedKeyRoot}
@@ -1765,6 +1851,7 @@ useEffect(() => {
               currentVoicings={currentVoicings}
               nextVoicings={nextVoicings}
               voicingModeLabel={voicingModeLabels[voicingMode]}
+              voicingFallbackMessage={voicingFallbackMessage}
               bestVoicingPair={bestVoicingPair}
               focusMode={focusMode}
               onToggleFocusMode={() => setFocusMode((prev) => !prev)}
@@ -3054,6 +3141,7 @@ function PracticePanel({
   currentVoicings,
   nextVoicings,
   voicingModeLabel,
+  voicingFallbackMessage,
   bestVoicingPair,
   focusMode,
   onToggleFocusMode,
@@ -3082,6 +3170,7 @@ function PracticePanel({
   currentVoicings: GuitarVoicing[];
   nextVoicings: GuitarVoicing[];
   voicingModeLabel: string;
+  voicingFallbackMessage?: string;
   bestVoicingPair: VoicingPair | null;
   focusMode: boolean;
   onToggleFocusMode: () => void;
@@ -3244,6 +3333,11 @@ function PracticePanel({
               title="모드"
               value={trainingMode === "solo" ? "즉흥 솔로" : voicingModeLabel}
             />
+            {voicingFallbackMessage && trainingMode === "chords" && (
+              <div className="rounded-lg border border-amber-400/20 bg-amber-500/10 p-3 text-xs font-bold text-[#F59E0B]">
+                {voicingFallbackMessage}
+              </div>
+            )}
             <PracticeMiniCard
               title="클릭"
               value={`${metronomeEnabled ? "메트로놈 ON" : "메트로놈 OFF"} / ${
@@ -3617,8 +3711,8 @@ function FretboardMap({
       return "target";
     }
     if (sameNotePitch(note, thirdNote)) return "third";
-    if (sameNotePitch(note, fifthNote)) return "chord";
     if (sameNotePitch(note, seventhNote)) return "seventh";
+    if (sameNotePitch(note, fifthNote)) return "chord";
     if (currentChordNotes.some((chordNote) => sameNotePitch(note, chordNote))) {
       return "chord";
     }
@@ -3716,11 +3810,20 @@ function FretboardMap({
       </div>
 
       <div className="mt-4 overflow-x-auto pb-1">
-        <div className="min-w-[840px]">
-          <div className="grid grid-cols-[36px_repeat(13,_1fr)] gap-1 text-center text-xs font-black text-[#64748B]">
+        <div className="min-w-[860px]">
+          <div className="grid grid-cols-[48px_repeat(13,_1fr)] gap-1 text-center text-xs font-black text-[#64748B]">
             <span />
             {frets.map((fret) => (
-              <span key={`fret-label-${fret}`}>{fret}</span>
+              <span
+                key={`fret-label-${fret}`}
+                className={
+                  fret === 0
+                    ? "rounded-md border-r-2 border-amber-400/40 bg-[#081426] py-1 text-[#F59E0B]"
+                    : "py-1"
+                }
+              >
+                {fret === 0 ? "Open" : fret}
+              </span>
             ))}
           </div>
 
@@ -3728,22 +3831,30 @@ function FretboardMap({
             {standardTuningNotes.map((stringNote, stringIndex) => (
               <div
                 key={`${mode}-${stringNote}-${stringIndex}`}
-                className="grid grid-cols-[36px_repeat(13,_1fr)] gap-1"
+                className="grid grid-cols-[48px_repeat(13,_1fr)] gap-1"
               >
                 <div className="flex items-center justify-end pr-2 text-xs font-black text-[#64748B]">
-                  {stringNote}
+                  {getGuitarStringNumber(stringIndex)} {stringNote}
                 </div>
                 {frets.map((fret) => {
-                  const note = getStringNoteAtFret(stringIndex, fret);
+                  const note = getStringNoteAtFret(
+                    stringIndex,
+                    fret,
+                    keyRoot
+                  );
                   const role = getFretRole(note);
                   const style = getRoleStyle(role);
 
                   return (
                     <div
                       key={`${stringIndex}-${fret}`}
-                      className="flex h-8 items-center justify-center rounded-md border text-xs font-black"
+                      className={`flex h-8 items-center justify-center rounded-md border text-xs font-black ${
+                        fret === 0 ? "border-r-2 border-r-amber-400/45" : ""
+                      }`}
                       style={style}
-                      title={`${stringNote} string ${fret} fret: ${note}`}
+                      title={`${getGuitarStringNumber(
+                        stringIndex
+                      )} string ${fret === 0 ? "open" : `${fret} fret`}: ${note}`}
                     >
                       <span className="leading-none">
                         {getRoleLabel(role, note)}
@@ -3829,6 +3940,7 @@ function ChordDiagram({
   const baseFret = minPressedFret > 4 ? minPressedFret : 1;
   const visibleFrets = Array.from({ length: 5 }, (_, index) => baseFret + index);
   const stringNames = ["E", "A", "D", "G", "B", "E"];
+  const chordRoot = voicing.rootNote ?? getChordRootSymbol(symbol);
   const rootPositions = getVoicingRootPositions(voicing, symbol);
   const guideToneNotes = getGuideToneNotes(symbol, voicing);
   const fingerings = parseFingeringString(voicing.fingering);
@@ -3842,7 +3954,7 @@ function ChordDiagram({
   }
 
   function getMarkerRole(stringIndex: number, fret: number) {
-    const note = getStringNoteAtFret(stringIndex, fret);
+    const note = getStringNoteAtFret(stringIndex, fret, chordRoot);
     const isRoot = rootPositions.some(
       (position) =>
         position.stringIndex === stringIndex && position.fret === fret
@@ -3943,7 +4055,7 @@ function ChordDiagram({
                     ? "text-[#02040A] shadow-[0_0_16px_rgba(245,158,11,0.24)]"
                     : "text-white"
                 }`}
-                title={`${getStringNoteAtFret(stringIndex, fret)} ${
+                title={`${getStringNoteAtFret(stringIndex, fret, chordRoot)} ${
                   markerRole === "root" ? "루트음" : ""
                 }`}
                 style={{

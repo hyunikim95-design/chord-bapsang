@@ -1,3 +1,12 @@
+export type GuitarVoicingTag =
+  | "easy"
+  | "open"
+  | "barre"
+  | "upper"
+  | "neo"
+  | "jazz"
+  | "cutting";
+
 export type GuitarVoicing = {
   name: string;
   frets: string;
@@ -10,6 +19,7 @@ export type GuitarVoicing = {
   guideTones?: string[];
   chordTones?: string[];
   intervalHint?: string;
+  tags?: GuitarVoicingTag[];
   note: string;
   difficulty: "쉬움" | "중간" | "어려움";
 };
@@ -27,6 +37,8 @@ const noteIndexes: Record<string, number> = {
   "D#": 3,
   Eb: 3,
   E: 4,
+  Fb: 4,
+  "E#": 5,
   F: 5,
   "F#": 6,
   Gb: 6,
@@ -37,6 +49,8 @@ const noteIndexes: Record<string, number> = {
   "A#": 10,
   Bb: 10,
   B: 11,
+  Cb: 11,
+  "B#": 0,
 };
 
 const sharpNotes = [
@@ -239,6 +253,13 @@ const voicingTheoryDefaults: Record<string, VoicingTheoryDefaults> = {
     chordTones: ["Eb", "G", "Bb"],
     intervalHint: "Eb 루트, G 장3도, Bb 완전5도",
   },
+  B: {
+    rootNote: "B",
+    guideTones: ["D#"],
+    guideToneHint: "3도 D#",
+    chordTones: ["B", "D#", "F#"],
+    intervalHint: "B 루트, D# 장3도, F# 완전5도",
+  },
   "F#m": {
     rootNote: "F#",
     guideTones: ["A"],
@@ -280,6 +301,20 @@ const voicingTheoryDefaults: Record<string, VoicingTheoryDefaults> = {
     guideToneHint: "3도 F, b7도 B",
     chordTones: ["C#", "F", "G#", "B"],
     intervalHint: "C# 루트, F 장3도, G# 완전5도, B 단7도",
+  },
+  Dmaj7: {
+    rootNote: "D",
+    guideTones: ["F#", "C#"],
+    guideToneHint: "3도 F#, 7도 C#",
+    chordTones: ["D", "F#", "A", "C#"],
+    intervalHint: "D 루트, F# 장3도, A 완전5도, C# 장7도",
+  },
+  Emaj7: {
+    rootNote: "E",
+    guideTones: ["G#", "D#"],
+    guideToneHint: "3도 G#, 7도 D#",
+    chordTones: ["E", "G#", "B", "D#"],
+    intervalHint: "E 루트, G# 장3도, B 완전5도, D# 장7도",
   },
 };
 
@@ -483,6 +518,31 @@ const guitarVoicingMap: Record<string, GuitarVoicing[]> = {
     },
   ],
 
+  Dmaj7: [
+    {
+      name: "오픈 Dmaj7",
+      frets: "xx0222",
+      fingering: "x x 0 1 1 1",
+      rootHint: "4번줄 개방현 D",
+      guideToneHint: "3도 F#, 7도 C#",
+      rootString: 4,
+      rootFret: 0,
+      rootNote: "D",
+      guideTones: ["F#", "C#"],
+      note: "밝고 부드러운 Dmaj7 오픈 보이싱.",
+      difficulty: "쉬움",
+      tags: ["easy", "open", "neo"],
+    },
+    {
+      name: "A폼 Dmaj7",
+      frets: "x57675",
+      fingering: "x 1 3 2 4 1",
+      note: "5프렛 근처에서 잡는 컬러감 있는 Dmaj7.",
+      difficulty: "중간",
+      tags: ["barre", "neo", "jazz"],
+    },
+  ],
+
   E: [
     {
       name: "오픈 E",
@@ -503,6 +563,31 @@ const guitarVoicingMap: Record<string, GuitarVoicing[]> = {
       fingering: "x x 3 3 3 1",
       note: "고음역에서 밝게 찍기 좋음.",
       difficulty: "중간",
+    },
+  ],
+
+  Emaj7: [
+    {
+      name: "오픈 Emaj7",
+      frets: "021100",
+      fingering: "0 2 1 1 0 0",
+      rootHint: "6번줄 개방현 E",
+      guideToneHint: "3도 G#, 7도 D#",
+      rootString: 6,
+      rootFret: 0,
+      rootNote: "E",
+      guideTones: ["G#", "D#"],
+      note: "오픈현이 살아 있는 부드러운 Emaj7.",
+      difficulty: "쉬움",
+      tags: ["easy", "open", "neo"],
+    },
+    {
+      name: "A폼 Emaj7",
+      frets: "x79897",
+      fingering: "x 1 3 2 4 1",
+      note: "네오소울/시티팝 연결에 쓰기 좋은 Emaj7.",
+      difficulty: "중간",
+      tags: ["barre", "neo", "jazz"],
     },
   ],
 
@@ -969,6 +1054,31 @@ const guitarVoicingMap: Record<string, GuitarVoicing[]> = {
     },
   ],
 
+  B: [
+    {
+      name: "A폼 바레 B",
+      frets: "x24442",
+      fingering: "x 1 3 3 3 1",
+      rootHint: "5번줄 2프렛 B",
+      guideToneHint: "3도 D#",
+      rootString: 5,
+      rootFret: 2,
+      rootNote: "B",
+      guideTones: ["D#"],
+      note: "A폼에서 올린 기본 B 메이저 바레.",
+      difficulty: "중간",
+      tags: ["barre"],
+    },
+    {
+      name: "상단현 B",
+      frets: "xx4442",
+      fingering: "x x 3 4 4 1",
+      note: "상단현 위주로 짧게 잡는 B 메이저.",
+      difficulty: "중간",
+      tags: ["upper"],
+    },
+  ],
+
   Bm: [
     {
       name: "A폼 바레 Bm",
@@ -1100,6 +1210,36 @@ function inferRootPosition(voicing: GuitarVoicing, rootNote?: string) {
   return null;
 }
 
+function inferVoicingTags(voicing: GuitarVoicing) {
+  const tags = new Set<GuitarVoicingTag>(voicing.tags ?? []);
+  const text = `${voicing.name} ${voicing.note} ${voicing.frets}`.toLowerCase();
+
+  if (voicing.difficulty === "쉬움") tags.add("easy");
+  if (voicing.frets.includes("0") || text.includes("open") || text.includes("오픈")) {
+    tags.add("open");
+  }
+  if (text.includes("barre") || text.includes("바레")) tags.add("barre");
+  if (text.includes("상단") || text.includes("cutting") || voicing.frets.startsWith("xx")) {
+    tags.add("upper");
+  }
+  if (
+    text.includes("neo") ||
+    text.includes("네오") ||
+    text.includes("시티") ||
+    text.includes("maj7") ||
+    text.includes("컬러") ||
+    text.includes("색채")
+  ) {
+    tags.add("neo");
+  }
+  if (text.includes("jazz") || text.includes("재즈") || text.includes("m7")) {
+    tags.add("jazz");
+  }
+  if (text.includes("cutting") || text.includes("커팅")) tags.add("cutting");
+
+  return [...tags];
+}
+
 function withVoicingMetadata(symbol: string, voicing: GuitarVoicing) {
   const defaults = voicingTheoryDefaults[symbol];
   const rootNote = voicing.rootNote ?? defaults?.rootNote;
@@ -1124,6 +1264,7 @@ function withVoicingMetadata(symbol: string, voicing: GuitarVoicing) {
     guideToneHint: voicing.guideToneHint ?? defaults?.guideToneHint,
     chordTones: voicing.chordTones ?? defaults?.chordTones,
     intervalHint: voicing.intervalHint ?? defaults?.intervalHint,
+    tags: inferVoicingTags(voicing),
   };
 }
 
