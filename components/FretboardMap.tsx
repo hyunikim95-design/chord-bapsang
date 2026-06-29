@@ -8,6 +8,7 @@ import {
   FretboardDisplayMode,
   GUIDE_TONE_COLOR,
   OPEN_TARGET_NOTE_COLOR,
+  RESOLVE_NOTE_COLOR,
   ROOT_NOTE_ACTIVE_COLOR,
   ROOT_NOTE_COLOR,
   ROOT_NOTE_DARK,
@@ -27,6 +28,7 @@ type FretboardMapProps = {
   currentChordNotes: string[];
   scaleNotes: string[];
   targetNotes?: string[];
+  resolveNotes?: string[];
   mode: "chord" | "solo";
 };
 
@@ -46,6 +48,8 @@ const displayModeLabels: Record<FretboardDisplayMode, string> = {
   guide: "가이드톤",
 };
 
+const tabDisplayStringIndexes = [5, 4, 3, 2, 1, 0];
+
 function getVisibleRole({
   role,
   note,
@@ -61,11 +65,11 @@ function getVisibleRole({
   if (role === "root") return role;
 
   if (displayMode === "target") {
-    return role === "target" ? role : "inactive";
+    return role === "target" || role === "resolve" ? role : "inactive";
   }
 
   if (displayMode === "scale") {
-    if (role === "target") return role;
+    if (role === "target" || role === "resolve") return role;
     return scaleNotes.some((scaleNote) => sameNotePitch(scaleNote, note))
       ? "scale"
       : "inactive";
@@ -73,6 +77,7 @@ function getVisibleRole({
 
   if (displayMode === "chord") {
     return role === "target" ||
+      role === "resolve" ||
       role === "third" ||
       role === "seventh" ||
       role === "chord"
@@ -81,7 +86,10 @@ function getVisibleRole({
   }
 
   if (displayMode === "guide") {
-    return role === "target" || role === "third" || role === "seventh"
+    return role === "target" ||
+      role === "resolve" ||
+      role === "third" ||
+      role === "seventh"
       ? role
       : "inactive";
   }
@@ -214,42 +222,46 @@ export function FretGrid({
       </div>
 
       <div className="mt-1.5 min-w-0 space-y-1.5">
-        {standardTuningNotes.map((stringNote, stringIndex) => (
-          <div
-            key={`${mode}-${stringNote}-${stringIndex}`}
-            className="grid min-w-0 grid-cols-[64px_repeat(12,_minmax(44px,_1fr))] gap-1.5"
-          >
-            <FretboardStringLane
-              stringNote={stringNote}
-              stringIndex={stringIndex}
-              keyRoot={keyRoot}
-              getFretRole={getFretRole}
-              getOpenLaneStyle={getOpenLaneStyle}
-              getOpenDotStyle={getOpenDotStyle}
-              getOpenAriaLabel={getOpenAriaLabel}
-            />
-            {frets.map((fret) => {
-              const note = getStringNoteAtFret(stringIndex, fret, keyRoot);
-              const role = getFretRole(note);
-              const style = getRoleStyle(role);
+        {tabDisplayStringIndexes.map((stringIndex) => {
+          const stringNote = standardTuningNotes[stringIndex] ?? "E";
 
-              return (
-                <div
-                  key={`${stringIndex}-${fret}`}
-                  className="flex h-8 items-center justify-center rounded-md border text-xs font-black"
-                  style={style}
-                  title={`${getGuitarStringNumber(
-                    stringIndex
-                  )} string ${fret} fret: ${note}`}
-                >
-                  <span className="leading-none">
-                    {getRoleLabel(role, note)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        ))}
+          return (
+            <div
+              key={`${mode}-${stringNote}-${stringIndex}`}
+              className="grid min-w-0 grid-cols-[64px_repeat(12,_minmax(44px,_1fr))] gap-1.5"
+            >
+              <FretboardStringLane
+                stringNote={stringNote}
+                stringIndex={stringIndex}
+                keyRoot={keyRoot}
+                getFretRole={getFretRole}
+                getOpenLaneStyle={getOpenLaneStyle}
+                getOpenDotStyle={getOpenDotStyle}
+                getOpenAriaLabel={getOpenAriaLabel}
+              />
+              {frets.map((fret) => {
+                const note = getStringNoteAtFret(stringIndex, fret, keyRoot);
+                const role = getFretRole(note);
+                const style = getRoleStyle(role);
+
+                return (
+                  <div
+                    key={`${stringIndex}-${fret}`}
+                    className="flex h-8 items-center justify-center rounded-md border text-xs font-black"
+                    style={style}
+                    title={`${getGuitarStringNumber(
+                      stringIndex
+                    )} string ${fret} fret: ${note}`}
+                  >
+                    <span className="leading-none">
+                      {getRoleLabel(role, note)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
     </>
   );
@@ -258,6 +270,7 @@ export function FretGrid({
 export function FretboardLegend({
   rootNote,
   targetNotes,
+  resolveNotes,
   guideToneNotes,
   currentChordNotes,
   scaleNotes,
@@ -265,13 +278,14 @@ export function FretboardLegend({
 }: {
   rootNote: string;
   targetNotes: string[];
+  resolveNotes: string[];
   guideToneNotes: string[];
   currentChordNotes: string[];
   scaleNotes: string[];
   displayMode: FretboardDisplayMode;
 }) {
   return (
-    <div className="mt-4 grid min-w-0 gap-2 rounded-lg border border-blue-950/40 bg-[#02040A] p-3 text-xs font-bold text-[#94A3B8] sm:grid-cols-2 lg:grid-cols-6">
+    <div className="mt-4 grid min-w-0 gap-2 rounded-lg border border-blue-950/40 bg-[#02040A] p-3 text-xs font-bold text-[#94A3B8] sm:grid-cols-2 lg:grid-cols-7">
       <div className="min-w-0 break-words">
         <span className="text-[#64748B]">Root</span>{" "}
         <span className="font-black text-[#FBBF24]">{rootNote}</span>
@@ -280,6 +294,12 @@ export function FretboardLegend({
         <span className="text-[#64748B]">Target</span>{" "}
         <span className="font-black text-[#DBEAFE]">
           {targetNotes.length > 0 ? targetNotes.join(", ") : "-"}
+        </span>
+      </div>
+      <div className="min-w-0 break-words">
+        <span className="text-[#64748B]">Resolve</span>{" "}
+        <span className="font-black text-[#A7F3D0]">
+          {resolveNotes.length > 0 ? resolveNotes.join(", ") : "-"}
         </span>
       </div>
       <div className="min-w-0 break-words">
@@ -316,6 +336,7 @@ export function FretboardMap({
   currentChordNotes,
   scaleNotes,
   targetNotes = [],
+  resolveNotes = [],
   mode,
 }: FretboardMapProps) {
   const [displayMode, setDisplayMode] =
@@ -328,6 +349,9 @@ export function FretboardMap({
   const guideToneNotes = [thirdNote, seventhNote].filter(Boolean);
   const displayedRootNote = formatNoteForKey(rootNote, keyRoot);
   const displayedTargetNotes = targetNotes.map((note) =>
+    formatNoteForKey(note, keyRoot)
+  );
+  const displayedResolveNotes = resolveNotes.map((note) =>
     formatNoteForKey(note, keyRoot)
   );
   const displayedGuideToneNotes = guideToneNotes.map((note) =>
@@ -344,6 +368,9 @@ export function FretboardMap({
     if (sameNotePitch(note, rootNote)) return "root";
     if (targetNotes.some((targetNote) => sameNotePitch(note, targetNote))) {
       return "target";
+    }
+    if (resolveNotes.some((resolveNote) => sameNotePitch(note, resolveNote))) {
+      return "resolve";
     }
     if (sameNotePitch(note, thirdNote)) return "third";
     if (sameNotePitch(note, seventhNote)) return "seventh";
@@ -382,6 +409,15 @@ export function FretboardMap({
         borderColor: "rgba(96, 165, 250, 0.48)",
         color: "#E5E7EB",
         boxShadow: "0 0 12px rgba(59,130,246,0.18)",
+      };
+    }
+
+    if (role === "resolve") {
+      return {
+        backgroundColor: "rgba(16, 185, 129, 0.16)",
+        borderColor: "rgba(52, 211, 153, 0.62)",
+        color: "#A7F3D0",
+        boxShadow: "inset 0 0 0 1px rgba(52,211,153,0.22)",
       };
     }
 
@@ -429,6 +465,10 @@ export function FretboardMap({
       return "border-blue-300/50 bg-blue-500/20 text-[#DBEAFE] shadow-[0_0_14px_rgba(96,165,250,0.2)]";
     }
 
+    if (role === "resolve") {
+      return "border-emerald-300/50 bg-emerald-500/15 text-[#A7F3D0] shadow-[0_0_12px_rgba(16,185,129,0.16)]";
+    }
+
     if (role === "third" || role === "seventh") {
       return "border-blue-700/45 bg-blue-900/30 text-[#CBD5E1]";
     }
@@ -451,6 +491,13 @@ export function FretboardMap({
     if (role === "target") {
       return { backgroundColor: OPEN_TARGET_NOTE_COLOR, color: "#02040A" };
     }
+    if (role === "resolve") {
+      return {
+        backgroundColor: RESOLVE_NOTE_COLOR,
+        color: "#022C22",
+        borderColor: "rgba(52, 211, 153, 0.45)",
+      };
+    }
     if (role === "third" || role === "seventh") {
       return { backgroundColor: GUIDE_TONE_COLOR, color: "#E5E7EB" };
     }
@@ -466,6 +513,7 @@ export function FretboardMap({
   function getOpenAriaLabel(role: FretRole, note: string) {
     if (role === "root") return `${note} open root`;
     if (role === "target") return `${note} open target`;
+    if (role === "resolve") return `${note} open resolve candidate`;
     if (role === "third" || role === "seventh") return `${note} open guide tone`;
     if (role === "chord") return `${note} open chord tone`;
     if (role === "scale") return `${note} open scale tone`;
@@ -501,6 +549,9 @@ export function FretboardMap({
             <span className="rounded-md bg-[#3B82F6] px-2 py-1 text-white">
               Target
             </span>
+            <span className="rounded-md border border-emerald-300/40 bg-emerald-500/15 px-2 py-1 text-[#A7F3D0]">
+              Resolve
+            </span>
             <span className="rounded-md bg-[#1E40AF] px-2 py-1 text-white">
               3 / 7
             </span>
@@ -528,6 +579,7 @@ export function FretboardMap({
           <FretboardLegend
             rootNote={displayedRootNote}
             targetNotes={displayedTargetNotes}
+            resolveNotes={displayedResolveNotes}
             guideToneNotes={displayedGuideToneNotes}
             currentChordNotes={displayedChordNotes}
             scaleNotes={displayedScaleNotes}

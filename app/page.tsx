@@ -721,22 +721,47 @@ function getEnhancedFocusMovementHint(
   return `NEXT MOVE: 루트 ${rootMove}. ${getMovementLabel(pair.distance)} 연결. 다음 코드 루트 먼저 확인.`;
 }
 
+function getUniquePitchNotes(notes: (string | undefined)[]) {
+  return notes.filter((note, index, list): note is string => {
+    if (!note) return false;
+    return (
+      list.findIndex(
+        (candidate) => Boolean(candidate) && areSamePitchClass(candidate, note)
+      ) === index
+    );
+  });
+}
+
 function getResolutionCandidates(nextItem: PracticeItem | undefined) {
   if (!nextItem || nextItem.notes.length === 0) return [];
 
   const quality = getChordQualityKey(nextItem.symbol);
   const root = nextItem.notes[0];
   const third = nextItem.notes[1];
+  const fifth = nextItem.notes[2];
+  const seventh = nextItem.notes[3];
 
-  if (quality === "dominant7" || quality === "maj7" || quality === "major") {
-    return [third, root].filter(Boolean);
+  if (
+    quality === "dominant7" ||
+    quality === "maj7" ||
+    quality === "m7" ||
+    quality === "m9" ||
+    quality === "maj9" ||
+    quality === "9" ||
+    quality === "13"
+  ) {
+    return getUniquePitchNotes([third, root, seventh]);
   }
 
-  if (quality === "m7" || quality === "minor" || quality === "m7b5") {
-    return [third, root].filter(Boolean);
+  if (quality === "m7b5") {
+    return getUniquePitchNotes([third, fifth, seventh, root]);
   }
 
-  return [root, third].filter(Boolean);
+  if (quality === "major" || quality === "minor") {
+    return getUniquePitchNotes([third, root]);
+  }
+
+  return getUniquePitchNotes([third, root, seventh]);
 }
 
 function getSoloTargetRecommendation(
@@ -753,6 +778,7 @@ function getSoloTargetRecommendation(
   const fifth = notes[2] ?? root;
   const seventh = notes[3];
   const resolutionCandidates = getResolutionCandidates(nextItem);
+  const resolution = resolutionCandidates.join(", ");
 
   if (quality === "dominant7") {
     const targetNote = third;
@@ -760,7 +786,8 @@ function getSoloTargetRecommendation(
       targetNote,
       alternateTargets: [third, seventh].filter(Boolean),
       reason: `${symbol}의 3도라서 도미넌트 긴장이 가장 선명하게 들립니다.`,
-      resolution: resolutionCandidates.join(", ") || "다음 코드의 루트",
+      resolution: resolution || "다음 코드의 루트",
+      resolutionCandidates,
       exercise: `${constraintPrompt}. ${rhythmPrompt}`,
     };
   }
@@ -771,7 +798,8 @@ function getSoloTargetRecommendation(
       targetNote,
       alternateTargets: [third, seventh].filter(Boolean),
       reason: `${symbol}의 3도/7도를 노리면 maj7의 세련된 색이 살아납니다.`,
-      resolution: resolutionCandidates.join(", ") || root,
+      resolution: resolution || root,
+      resolutionCandidates,
       exercise: rhythmPrompt,
     };
   }
@@ -782,7 +810,8 @@ function getSoloTargetRecommendation(
       targetNote,
       alternateTargets: [third, seventh].filter(Boolean),
       reason: `${symbol}의 b3/b7을 노리면 마이너 계열 색이 바로 들립니다.`,
-      resolution: resolutionCandidates.join(", ") || root,
+      resolution: resolution || root,
+      resolutionCandidates,
       exercise: `${constraintPrompt}. ${rhythmPrompt}`,
     };
   }
@@ -792,7 +821,8 @@ function getSoloTargetRecommendation(
       targetNote: third,
       alternateTargets: [third, root].filter(Boolean),
       reason: `${symbol}의 b3를 먼저 들으면 마이너 정서가 안정적으로 잡힙니다.`,
-      resolution: resolutionCandidates.join(", ") || root,
+      resolution: resolution || root,
+      resolutionCandidates,
       exercise: rhythmPrompt,
     };
   }
@@ -801,7 +831,8 @@ function getSoloTargetRecommendation(
     targetNote: third,
     alternateTargets: [third, fifth, root].filter(Boolean),
     reason: `${symbol}의 3도를 먼저 노리면 코드 성격이 가장 빠르게 들립니다.`,
-    resolution: resolutionCandidates.join(", ") || root,
+    resolution: resolution || root,
+    resolutionCandidates,
     exercise: rhythmPrompt,
   };
 }
@@ -3684,6 +3715,7 @@ function SoloPracticePanel({
           ? `b3/b7 후보 ${soloRecommendation.alternateTargets.join(", ")} 확인`
           : `3도 ${soloRecommendation.targetNote}을 중심으로 시작`;
   const soloResolution = `다음 코드에서 ${soloRecommendation.resolution} 착지`;
+  const resolveNotes = soloRecommendation.resolutionCandidates;
   const targetNotes = soloRecommendation.alternateTargets.length
     ? soloRecommendation.alternateTargets
     : [soloRecommendation.targetNote];
@@ -3711,9 +3743,10 @@ function SoloPracticePanel({
         </span>
       </div>
 
-      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-3">
         <SoloInfoBlock title="스케일" notes={soloScaleNotes} />
         <SoloInfoBlock title="현재 코드톤" notes={chordTones} />
+        <SoloInfoBlock title="다음 착지 후보" notes={resolveNotes} />
       </div>
 
       <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -3735,12 +3768,15 @@ function SoloPracticePanel({
         <div className="mt-3 grid min-w-0 gap-2 text-sm font-black leading-6">
           <p className="break-words text-[#CBD5E1]">
             타겟{" "}
-            <span style={{ color: ROOT_NOTE_COLOR }}>
+            <span style={{ color: TARGET_NOTE_COLOR }}>
               {soloRecommendation.targetNote}
             </span>
           </p>
           <p className="break-words text-[#94A3B8]">접근: {soloApproach}</p>
           <p className="break-words text-[#94A3B8]">해결: {soloResolution}</p>
+          <p className="break-words text-[#A7F3D0]">
+            착지 후보: {resolveNotes.length > 0 ? resolveNotes.join(", ") : "-"}
+          </p>
           <p className="break-words text-[#94A3B8]">리듬: {rhythmPrompt}</p>
         </div>
       </div>
@@ -3778,6 +3814,7 @@ function SoloPracticePanel({
           currentChordNotes={chordTones}
           scaleNotes={soloScaleNotes}
           targetNotes={targetNotes}
+          resolveNotes={resolveNotes}
           mode="solo"
         />
       )}

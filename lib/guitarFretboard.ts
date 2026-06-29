@@ -11,6 +11,7 @@ export const ROOT_NOTE_ACTIVE_COLOR = "#FBBF24";
 export const ROOT_NOTE_DARK = "#02040A";
 export const TARGET_NOTE_COLOR = "#3B82F6";
 export const OPEN_TARGET_NOTE_COLOR = "#60A5FA";
+export const RESOLVE_NOTE_COLOR = "#10B981";
 export const GUIDE_TONE_COLOR = "#1E40AF";
 export const CHORD_TONE_COLOR = "#334155";
 export const SCALE_TONE_COLOR = "#1E293B";
@@ -21,6 +22,7 @@ export const standardTuningNotes = ["E", "A", "D", "G", "B", "E"];
 export type FretRole =
   | "root"
   | "target"
+  | "resolve"
   | "third"
   | "seventh"
   | "chord"
