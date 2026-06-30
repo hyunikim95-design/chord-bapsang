@@ -1148,7 +1148,7 @@ const [favoriteTitleInput, setFavoriteTitleInput] = useState("");
   const currentPracticeItem = progressionAnalysis.items[safeCurrentIndex];
 
   const nextPracticeItem =
-    itemCount > 0
+    itemCount > 1
       ? progressionAnalysis.items[(safeCurrentIndex + 1) % itemCount]
       : undefined;
 

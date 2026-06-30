@@ -422,7 +422,7 @@ function getKeyRoles(symbol: string) {
 
 export function parseProgression(input: string) {
   return input
-    .split(/\s*-\s*|\s*,\s*|\s*\|\s*/)
+    .split(/\s*-\s*(?=[A-G](?:#|b)?)|\s*,\s*|\s*\|\s*/)
     .map((symbol) => symbol.trim())
     .filter(Boolean)
     .map((symbol) => ({
