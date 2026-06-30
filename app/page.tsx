@@ -1326,12 +1326,15 @@ const [favoriteTitleInput, setFavoriteTitleInput] = useState("");
     }
 
     setPracticeMode(true);
+    setBeatInChord(1);
 
     if (countInEnabled) {
+      setIsAutoPlaying(false);
       setCountInRemaining(countInBeats);
       return;
     }
 
+    setCountInRemaining(null);
     playMetronomeClick(true);
     setIsAutoPlaying(true);
   }
@@ -1720,15 +1723,13 @@ useEffect(() => {
   useEffect(() => {
     if (!practiceMode || !isAutoPlaying) return;
     if (countInRemaining !== null) return;
-    if (progressionAnalysis.items.length === 0) return;
+    if (itemCount === 0) return;
 
     const timer = window.setInterval(() => {
       setBeatInChord((prevBeat) => {
         if (prevBeat >= safeBeatsPerChord) {
           playMetronomeClick(true);
-          setCurrentIndex((prevIndex) =>
-            (prevIndex + 1) % progressionAnalysis.items.length
-          );
+          setCurrentIndex((prevIndex) => (prevIndex + 1) % itemCount);
           return 1;
         }
 
@@ -1747,7 +1748,7 @@ useEffect(() => {
     countInRemaining,
     playMetronomeClick,
     safeBeatsPerChord,
-    progressionAnalysis.items.length,
+    itemCount,
   ]);
 
   useEffect(() => {
@@ -1790,9 +1791,13 @@ useEffect(() => {
         return;
       }
 
+      setBeatInChord(1);
+
       if (countInEnabled) {
+        setIsAutoPlaying(false);
         setCountInRemaining(countInBeats);
       } else {
+        setCountInRemaining(null);
         playMetronomeClick(true);
         setIsAutoPlaying(true);
       }
