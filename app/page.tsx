@@ -264,6 +264,7 @@ type FavoriteProgressionItem = {
 };
 type TrainingMode = "chords" | "solo";
 type ViewMode = "minimal" | "normal" | "study";
+type PracticeStep = "chord" | "root" | "rhythm" | "solo";
 type TheorySectionId =
   | "summary"
   | "roman"
@@ -294,6 +295,18 @@ const viewModeLabels: Record<ViewMode, string> = {
   minimal: "Minimal",
   normal: "Normal",
   study: "Study",
+};
+const practiceStepLabels: Record<PracticeStep, string> = {
+  chord: "Chord",
+  root: "Root",
+  rhythm: "Rhythm",
+  solo: "Solo",
+};
+const practiceStepDescriptions: Record<PracticeStep, string> = {
+  chord: "코드폼과 다음 코드 이동만 확인",
+  root: "루트 위치를 먼저 보고 손 위치 잡기",
+  rhythm: "BPM, 박자, 재생 상태에 집중",
+  solo: "타겟 노트와 다음 착지 후보 연습",
 };
 const defaultOpenStudySections: TheorySectionId[] = ["summary", "roman"];
 const ROOT_NOTE_COLOR = "#F59E0B";
@@ -1087,6 +1100,7 @@ export default function Home() {
   const [practiceMode, setPracticeMode] = useState(true);
   const [trainingMode, setTrainingMode] = useState<TrainingMode>("chords");
   const [viewMode, setViewMode] = useState<ViewMode>("minimal");
+  const [practiceStep, setPracticeStep] = useState<PracticeStep>("chord");
   const [openStudySections, setOpenStudySections] = useState<TheorySectionId[]>(
     defaultOpenStudySections
   );
@@ -1357,6 +1371,7 @@ function applyPracticePreset(preset: PracticePreset) {
   setBeatInChord(1);
   setIsAutoPlaying(false);
   setPracticeMode(true);
+  setPracticeStep("chord");
   setFocusMode(false);
 }
 function generateRandomProgression() {
@@ -1501,6 +1516,7 @@ function applyRecentPracticeSession(item: RecentPracticeSession) {
   setBeatsPerChord(item.beatsPerChord);
   setVoicingMode(item.voicingMode);
   setTrainingMode(item.trainingMode);
+  setPracticeStep(item.trainingMode === "solo" ? "solo" : "chord");
   setCurrentIndex(0);
   setBeatInChord(1);
   setIsAutoPlaying(false);
@@ -1512,10 +1528,12 @@ function applyRecentPracticeSession(item: RecentPracticeSession) {
 function applyDailyPracticePreset() {
   applyPracticePreset(dailyPracticePreset);
   setTrainingMode("chords");
+  setPracticeStep("chord");
 }
 
 function updateTrainingMode(nextTrainingMode: TrainingMode) {
   setTrainingMode(nextTrainingMode);
+  setPracticeStep(nextTrainingMode === "solo" ? "solo" : "chord");
   setFocusMode(false);
   resetPracticePlayback();
 }
@@ -1880,7 +1898,7 @@ useEffect(() => {
             <SectionTitle
               eyebrow="Practice Console"
               title="연습 콘솔"
-              description="기타 들고 보는 최소 정보 중심 화면. 긴 화성학 설명은 아래 Theory Lab에서 확인."
+              description="Minimal은 바로 칠 정보만, 자세한 분석은 Normal 또는 Study에서 확인."
             />
 
             <button
@@ -1924,6 +1942,7 @@ useEffect(() => {
               nextPracticeItem={nextPracticeItem}
               trainingMode={trainingMode}
               viewMode={viewMode}
+              practiceStep={practiceStep}
               currentIndex={safeCurrentIndex}
               totalCount={progressionAnalysis.items.length}
               selectedKey={progressionAnalysis.selectedKey}
@@ -1943,6 +1962,7 @@ useEffect(() => {
               voicingFallbackMessage={voicingFallbackMessage}
               bestVoicingPair={bestVoicingPair}
               focusMode={focusMode}
+              onPracticeStepChange={setPracticeStep}
               onToggleFocusMode={() => setFocusMode((prev) => !prev)}
               onPrev={goPrevChord}
               onNext={goNextChord}
@@ -3214,6 +3234,7 @@ function PracticePanel({
   nextPracticeItem,
   trainingMode,
   viewMode,
+  practiceStep,
   currentIndex,
   totalCount,
   selectedKey,
@@ -3233,6 +3254,7 @@ function PracticePanel({
   voicingFallbackMessage,
   bestVoicingPair,
   focusMode,
+  onPracticeStepChange,
   onToggleFocusMode,
   onPrev,
   onNext,
@@ -3243,6 +3265,7 @@ function PracticePanel({
   nextPracticeItem: PracticeItem | undefined;
   trainingMode: TrainingMode;
   viewMode: ViewMode;
+  practiceStep: PracticeStep;
   currentIndex: number;
   totalCount: number;
   selectedKey: string;
@@ -3262,6 +3285,7 @@ function PracticePanel({
   voicingFallbackMessage?: string;
   bestVoicingPair: VoicingPair | null;
   focusMode: boolean;
+  onPracticeStepChange: (step: PracticeStep) => void;
   onToggleFocusMode: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -3273,6 +3297,41 @@ function PracticePanel({
     nextPracticeItem?.symbol,
     bestVoicingPair
   );
+  const rhythmPrompt =
+    soloRhythmPrompts[currentIndex % soloRhythmPrompts.length];
+  const constraintPrompt =
+    soloConstraintPrompts[currentIndex % soloConstraintPrompts.length];
+  const soloRecommendation = getSoloTargetRecommendation(
+    currentPracticeItem,
+    nextPracticeItem,
+    rhythmPrompt,
+    constraintPrompt
+  );
+  const currentRootHint = bestVoicingPair
+    ? getRootHint(currentPracticeItem.symbol, bestVoicingPair.currentVoicing)
+    : currentPracticeItem.notes[0] || getChordRootSymbol(currentPracticeItem.symbol);
+  const nextRootHint =
+    bestVoicingPair && nextPracticeItem
+      ? getRootHint(nextPracticeItem.symbol, bestVoicingPair.nextVoicing)
+      : nextPracticeItem?.notes[0] || getChordRootSymbol(nextPracticeItem?.symbol ?? "");
+  const stepHint =
+    practiceStep === "root"
+      ? `루트: ${currentRootHint} / 다음 ${nextRootHint || "-"}`
+      : practiceStep === "rhythm"
+        ? `${safeBpm} BPM, ${safeBeatsPerChord}박마다 코드 변경`
+        : practiceStep === "solo"
+          ? `타겟 ${soloRecommendation.targetNote} → ${soloRecommendation.resolution}`
+          : focusMovementHint;
+  const showFullSoloPanel =
+    trainingMode === "solo" && (viewMode !== "minimal" || practiceStep === "solo");
+  const showBestMovePanel =
+    trainingMode === "chords" &&
+    bestVoicingPair &&
+    (viewMode !== "minimal" || practiceStep === "chord");
+  const showMinimalStepFocus =
+    viewMode === "minimal" &&
+    ((trainingMode === "solo" && practiceStep !== "solo") ||
+      (trainingMode === "chords" && practiceStep !== "chord"));
 
   if (focusMode) {
     return (
@@ -3321,7 +3380,28 @@ function PracticePanel({
           safeBeatsPerChord={safeBeatsPerChord}
         />
 
-        {trainingMode === "solo" ? (
+        <MinimalPracticeStrip
+          currentPracticeItem={currentPracticeItem}
+          nextPracticeItem={nextPracticeItem}
+          trainingMode={trainingMode}
+          practiceStep={practiceStep}
+          stepHint={stepHint}
+          safeBpm={safeBpm}
+          safeBeatsPerChord={safeBeatsPerChord}
+          beatInChord={beatInChord}
+          isAutoPlaying={isAutoPlaying}
+          countInRemaining={countInRemaining}
+          onPrev={onPrev}
+          onNext={onNext}
+          onTogglePlay={onTogglePlay}
+        />
+
+        <PracticeStepToggle
+          practiceStep={practiceStep}
+          onChange={onPracticeStepChange}
+        />
+
+        {showFullSoloPanel ? (
           <SoloPracticePanel
             currentPracticeItem={currentPracticeItem}
             nextPracticeItem={nextPracticeItem}
@@ -3368,8 +3448,29 @@ function PracticePanel({
 
   return (
     <section className="mt-5 min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#050B16] p-4 shadow-2xl shadow-black/25">
+      <MinimalPracticeStrip
+        currentPracticeItem={currentPracticeItem}
+        nextPracticeItem={nextPracticeItem}
+        trainingMode={trainingMode}
+        practiceStep={practiceStep}
+        stepHint={stepHint}
+        safeBpm={safeBpm}
+        safeBeatsPerChord={safeBeatsPerChord}
+        beatInChord={beatInChord}
+        isAutoPlaying={isAutoPlaying}
+        countInRemaining={countInRemaining}
+        onPrev={onPrev}
+        onNext={onNext}
+        onTogglePlay={onTogglePlay}
+      />
+
+      <PracticeStepToggle
+        practiceStep={practiceStep}
+        onChange={onPracticeStepChange}
+      />
+
       <div
-        className={`grid min-w-0 gap-4 lg:items-stretch ${
+        className={`mt-4 grid min-w-0 gap-4 lg:items-stretch ${
           trainingMode === "solo"
             ? "xl:grid-cols-[160px_minmax(0,1fr)]"
             : "lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]"
@@ -3451,23 +3552,59 @@ function PracticePanel({
               trainingMode === "solo" ? "sm:grid-cols-2 xl:grid-cols-1" : "sm:grid-cols-2 lg:grid-cols-1"
             }`}
           >
-            <PracticeMiniCard title="BPM / 박자" value={`${safeBpm} / ${safeBeatsPerChord}`} />
-            <PracticeMiniCard title="다음 코드" value={nextPracticeItem?.symbol ?? "-"} />
-            <PracticeMiniCard
-              title="모드"
-              value={trainingMode === "solo" ? "즉흥 솔로" : voicingModeLabel}
-            />
+            {practiceStep === "chord" && (
+              <>
+                <PracticeMiniCard title="다음 코드" value={nextPracticeItem?.symbol ?? "-"} />
+                <PracticeMiniCard
+                  title="보이싱"
+                  value={
+                    bestVoicingPair
+                      ? bestVoicingPair.currentVoicing.frets
+                      : voicingModeLabel
+                  }
+                />
+                <PracticeMiniCard title="이동 힌트" value={focusMovementHint} />
+              </>
+            )}
+            {practiceStep === "root" && (
+              <>
+                <PracticeMiniCard title="현재 루트" value={currentRootHint} />
+                <PracticeMiniCard title="다음 루트" value={nextRootHint || "-"} />
+              </>
+            )}
+            {practiceStep === "rhythm" && (
+              <>
+                <PracticeMiniCard title="BPM / 박자" value={`${safeBpm} / ${safeBeatsPerChord}`} />
+                <PracticeMiniCard
+                  title="재생 상태"
+                  value={
+                    countInRemaining !== null
+                      ? `카운트인 ${countInRemaining}`
+                      : isAutoPlaying
+                        ? "재생 중"
+                        : "정지"
+                  }
+                />
+                <PracticeMiniCard
+                  title="클릭"
+                  value={`${metronomeEnabled ? "메트로놈 ON" : "메트로놈 OFF"} / ${
+                    rootDroneEnabled ? "드론 ON" : "드론 OFF"
+                  } / ${countInEnabled ? "카운트인 ON" : "카운트인 OFF"}`}
+                />
+              </>
+            )}
+            {practiceStep === "solo" && (
+              <>
+                <PracticeMiniCard title="타겟 노트" value={soloRecommendation.targetNote} />
+                <PracticeMiniCard title="착지 후보" value={soloRecommendation.resolution} />
+                <PracticeMiniCard title="연습 과제" value={soloRecommendation.exercise} />
+              </>
+            )}
             {voicingFallbackMessage && trainingMode === "chords" && (
               <div className="rounded-lg border border-amber-400/20 bg-amber-500/10 p-3 text-xs font-bold text-[#F59E0B]">
                 {voicingFallbackMessage}
               </div>
             )}
-            <PracticeMiniCard
-              title="클릭"
-              value={`${metronomeEnabled ? "메트로놈 ON" : "메트로놈 OFF"} / ${
-                rootDroneEnabled ? "드론 ON" : "드론 OFF"
-              } / ${countInEnabled ? "카운트인 ON" : "카운트인 OFF"}`}
-            />
             {viewMode !== "minimal" && (
               <PracticeMiniCard title="기능" value={currentPracticeItem.functionName} />
             )}
@@ -3490,7 +3627,7 @@ function PracticePanel({
             soloScaleNotes={soloScaleNotes}
             currentIndex={currentIndex}
           />
-        ) : bestVoicingPair ? (
+        ) : showBestMovePanel && bestVoicingPair ? (
           <section className="min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#0A1220] p-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
@@ -3527,6 +3664,16 @@ function PracticePanel({
               </p>
             )}
           </section>
+        ) : showMinimalStepFocus ? (
+          <MinimalStepFocusCard
+            practiceStep={practiceStep}
+            currentSymbol={currentPracticeItem.symbol}
+            nextSymbol={nextPracticeItem?.symbol ?? "-"}
+            stepHint={stepHint}
+            rootHint={currentRootHint}
+            targetNote={soloRecommendation.targetNote}
+            resolveNotes={soloRecommendation.resolution}
+          />
         ) : null}
       </div>
 
@@ -3542,6 +3689,209 @@ function PracticePanel({
 
       <p className="mt-3 text-xs font-bold text-slate-500">
         Enter 재생 / Space·→ 다음 / ← 이전 / F 집중모드 / M 보이싱 변경 / Esc 종료
+      </p>
+    </section>
+  );
+}
+
+function MinimalPracticeStrip({
+  currentPracticeItem,
+  nextPracticeItem,
+  trainingMode,
+  practiceStep,
+  stepHint,
+  safeBpm,
+  safeBeatsPerChord,
+  beatInChord,
+  isAutoPlaying,
+  countInRemaining,
+  onPrev,
+  onNext,
+  onTogglePlay,
+}: {
+  currentPracticeItem: PracticeItem;
+  nextPracticeItem: PracticeItem | undefined;
+  trainingMode: TrainingMode;
+  practiceStep: PracticeStep;
+  stepHint: string;
+  safeBpm: number;
+  safeBeatsPerChord: number;
+  beatInChord: number;
+  isAutoPlaying: boolean;
+  countInRemaining: number | null;
+  onPrev: () => void;
+  onNext: () => void;
+  onTogglePlay: () => void;
+}) {
+  const playbackLabel =
+    countInRemaining !== null
+      ? `카운트인 ${countInRemaining}`
+      : isAutoPlaying
+        ? "재생 중"
+        : "정지";
+
+  return (
+    <section className="min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#02040A] p-3 shadow-lg shadow-black/20">
+      <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center">
+          <div className="min-w-0 rounded-lg border border-blue-900/25 bg-[#07111F] p-3">
+            <p className="text-xs font-black uppercase text-[#64748B]">
+              Now
+            </p>
+            <p className="mt-1 break-words text-4xl font-black leading-none text-white md:text-5xl">
+              {currentPracticeItem.symbol}
+            </p>
+          </div>
+          <div className="hidden text-center text-2xl font-black text-[#475569] sm:block">
+            →
+          </div>
+          <div className="min-w-0 rounded-lg border border-blue-900/25 bg-[#07111F] p-3">
+            <p className="text-xs font-black uppercase text-[#64748B]">
+              Next
+            </p>
+            <p className="mt-1 break-words text-3xl font-black leading-none text-[#CBD5E1] md:text-4xl">
+              {nextPracticeItem?.symbol ?? "-"}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid min-w-0 gap-2 sm:grid-cols-[1fr_auto] lg:min-w-[340px] lg:grid-cols-1">
+          <div className="rounded-lg border border-blue-900/25 bg-[#07111F] p-3">
+            <div className="flex min-w-0 items-center justify-between gap-3">
+              <p className="text-xs font-black uppercase text-[#64748B]">
+                {practiceStepLabels[practiceStep]} / {trainingMode === "solo" ? "Solo" : "Chord"}
+              </p>
+              <p className="shrink-0 text-xs font-black text-[#94A3B8]">
+                {safeBpm} BPM · {beatInChord}/{safeBeatsPerChord}
+              </p>
+            </div>
+            <p className="mt-1 break-words text-sm font-black leading-6 text-[#E5E7EB]">
+              {stepHint}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5">
+            <button
+              type="button"
+              onClick={onPrev}
+              className="rounded-md border border-blue-900/30 bg-[#07111F] px-3 py-2 text-xs font-black text-[#CBD5E1] transition hover:bg-[#0B1730]"
+            >
+              이전
+            </button>
+            <button
+              type="button"
+              onClick={onTogglePlay}
+              className="rounded-md bg-[#1E40AF] px-3 py-2 text-xs font-black text-white transition hover:bg-[#2563EB]"
+            >
+              {isAutoPlaying || countInRemaining !== null ? "정지" : "재생"}
+            </button>
+            <button
+              type="button"
+              onClick={onNext}
+              className="rounded-md border border-blue-900/30 bg-[#07111F] px-3 py-2 text-xs font-black text-[#CBD5E1] transition hover:bg-[#0B1730]"
+            >
+              다음
+            </button>
+          </div>
+
+          <p className="text-right text-xs font-bold text-[#64748B] sm:col-span-2 lg:col-span-1">
+            {playbackLabel}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PracticeStepToggle({
+  practiceStep,
+  onChange,
+}: {
+  practiceStep: PracticeStep;
+  onChange: (step: PracticeStep) => void;
+}) {
+  return (
+    <div className="mt-3 grid min-w-0 gap-2 rounded-lg border border-blue-900/30 bg-black/20 p-1.5 sm:grid-cols-4">
+      {(Object.keys(practiceStepLabels) as PracticeStep[]).map((step) => {
+        const isActive = practiceStep === step;
+
+        return (
+          <button
+            key={step}
+            type="button"
+            aria-pressed={isActive}
+            onClick={() => onChange(step)}
+            className={`min-w-0 rounded-md px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-blue-700/70 ${
+              isActive
+                ? "border border-blue-700/50 bg-[#1E40AF] text-white shadow-sm shadow-black/30"
+                : "border border-blue-950/30 bg-[#07111F] text-[#94A3B8] hover:bg-[#0B1730] hover:text-[#E5E7EB]"
+            }`}
+          >
+            <span className="block text-sm font-black">
+              {practiceStepLabels[step]}
+            </span>
+            <span className="mt-0.5 block truncate text-xs font-bold opacity-75">
+              {practiceStepDescriptions[step]}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function MinimalStepFocusCard({
+  practiceStep,
+  currentSymbol,
+  nextSymbol,
+  stepHint,
+  rootHint,
+  targetNote,
+  resolveNotes,
+}: {
+  practiceStep: PracticeStep;
+  currentSymbol: string;
+  nextSymbol: string;
+  stepHint: string;
+  rootHint: string;
+  targetNote: string;
+  resolveNotes: string;
+}) {
+  const title =
+    practiceStep === "root"
+      ? "Root Check"
+      : practiceStep === "rhythm"
+        ? "Rhythm Lock"
+        : practiceStep === "solo"
+          ? "Solo Target"
+          : "Chord Move";
+  const value =
+    practiceStep === "root"
+      ? rootHint
+      : practiceStep === "solo"
+        ? `${targetNote} → ${resolveNotes}`
+        : stepHint;
+
+  return (
+    <section className="min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#0A1220] p-4">
+      <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-black uppercase text-[#64748B]">
+            {title}
+          </p>
+          <h3 className="mt-1 break-words text-2xl font-black text-white">
+            {currentSymbol} → {nextSymbol}
+          </h3>
+        </div>
+        <span className="max-w-full break-words rounded-lg border border-blue-900/30 bg-[#07111F] px-3 py-2 text-sm font-black text-[#CBD5E1]">
+          {practiceStepLabels[practiceStep]}
+        </span>
+      </div>
+      <p className="mt-4 break-words rounded-lg border border-blue-900/30 bg-[#02040A] p-4 text-lg font-black leading-7 text-[#E5E7EB]">
+        {value}
+      </p>
+      <p className="mt-3 text-sm font-bold leading-6 text-[#64748B]">
+        자세한 보이싱, 프렛보드, 화성학 설명은 Normal 또는 Study에서 확인.
       </p>
     </section>
   );
