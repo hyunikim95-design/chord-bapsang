@@ -1091,6 +1091,9 @@ export default function Home() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const droneOscillatorRef = useRef<OscillatorNode | null>(null);
   const droneGainRef = useRef<GainNode | null>(null);
+  const currentIndexRef = useRef(0);
+  const beatInChordRef = useRef(1);
+  const itemCountRef = useRef(0);
   const [input, setInput] = useState("A");
   const [showAdvanced, setShowAdvanced] = useState(true);
 
@@ -1223,12 +1226,26 @@ const [favoriteTitleInput, setFavoriteTitleInput] = useState("");
   );
 
   useEffect(() => {
+    currentIndexRef.current = safeCurrentIndex;
+  }, [safeCurrentIndex]);
+
+  useEffect(() => {
+    beatInChordRef.current = beatInChord;
+  }, [beatInChord]);
+
+  useEffect(() => {
+    itemCountRef.current = itemCount;
+  }, [itemCount]);
+
+  useEffect(() => {
     const nextIndex =
       itemCount === 0 ? 0 : Math.min(currentIndex, itemCount - 1);
 
     if (nextIndex === currentIndex) return;
 
     const timer = window.setTimeout(() => {
+      currentIndexRef.current = nextIndex;
+      beatInChordRef.current = 1;
       setCurrentIndex(nextIndex);
       setBeatInChord(1);
     }, 0);
@@ -1299,6 +1316,7 @@ const [favoriteTitleInput, setFavoriteTitleInput] = useState("");
   );
 
   function resetBeat() {
+    beatInChordRef.current = 1;
     setBeatInChord(1);
   }
 
@@ -1326,6 +1344,7 @@ const [favoriteTitleInput, setFavoriteTitleInput] = useState("");
     }
 
     setPracticeMode(true);
+    beatInChordRef.current = 1;
     setBeatInChord(1);
 
     if (countInEnabled) {
@@ -1339,6 +1358,8 @@ const [favoriteTitleInput, setFavoriteTitleInput] = useState("");
     setIsAutoPlaying(true);
   }
 function resetPracticePlayback() {
+  currentIndexRef.current = 0;
+  beatInChordRef.current = 1;
   setCurrentIndex(0);
   setBeatInChord(1);
   setIsAutoPlaying(false);
@@ -1704,6 +1725,7 @@ useEffect(() => {
         if (prev === null) return null;
 
         if (prev <= 1) {
+          beatInChordRef.current = 1;
           setBeatInChord(1);
           setIsAutoPlaying(true);
           playMetronomeClick(true);
@@ -1726,16 +1748,28 @@ useEffect(() => {
     if (itemCount === 0) return;
 
     const timer = window.setInterval(() => {
-      setBeatInChord((prevBeat) => {
-        if (prevBeat >= safeBeatsPerChord) {
-          playMetronomeClick(true);
-          setCurrentIndex((prevIndex) => (prevIndex + 1) % itemCount);
-          return 1;
-        }
+      const currentBeat = beatInChordRef.current;
 
-        playMetronomeClick(false);
-        return prevBeat + 1;
-      });
+      if (currentBeat >= safeBeatsPerChord) {
+        const currentItemCount = itemCountRef.current;
+        const nextIndex =
+          currentItemCount > 0
+            ? (currentIndexRef.current + 1) % currentItemCount
+            : 0;
+
+        playMetronomeClick(true);
+        currentIndexRef.current = nextIndex;
+        beatInChordRef.current = 1;
+        setCurrentIndex(nextIndex);
+        setBeatInChord(1);
+        return;
+      }
+
+      const nextBeat = currentBeat + 1;
+
+      playMetronomeClick(false);
+      beatInChordRef.current = nextBeat;
+      setBeatInChord(nextBeat);
     }, beatMs);
 
     return () => {
@@ -1791,6 +1825,7 @@ useEffect(() => {
         return;
       }
 
+      beatInChordRef.current = 1;
       setBeatInChord(1);
 
       if (countInEnabled) {
