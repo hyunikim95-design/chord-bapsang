@@ -292,9 +292,9 @@ const favoriteProgressionsStorageKey =
 const recentPracticeSessionsStorageKey =
   "chord-bapsang-recent-practice-sessions-v1";
 const viewModeLabels: Record<ViewMode, string> = {
-  minimal: "Minimal",
-  normal: "Normal",
-  study: "Study",
+  minimal: "연습",
+  normal: "분석",
+  study: "공부",
 };
 const practiceStepLabels: Record<PracticeStep, string> = {
   chord: "Chord",
@@ -1101,6 +1101,7 @@ export default function Home() {
   const [trainingMode, setTrainingMode] = useState<TrainingMode>("chords");
   const [viewMode, setViewMode] = useState<ViewMode>("minimal");
   const [practiceStep, setPracticeStep] = useState<PracticeStep>("chord");
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
   const [openStudySections, setOpenStudySections] = useState<TheorySectionId[]>(
     defaultOpenStudySections
   );
@@ -1888,7 +1889,16 @@ useEffect(() => {
                   {practiceMode ? "Practice Console" : "Theory Lab"}
                 </p>
               </div>
-              <ViewModeTabs viewMode={viewMode} onChange={setViewMode} />
+              <div className="flex flex-wrap items-center gap-2">
+                <ViewModeTabs viewMode={viewMode} onChange={setViewMode} />
+                <button
+                  type="button"
+                  onClick={() => setDetailSheetOpen(true)}
+                  className="rounded-lg border border-blue-900/30 bg-[#07111F] px-4 py-2 text-xs font-black text-[#CBD5E1] transition hover:border-blue-700/60 hover:bg-[#0B1730] hover:text-white"
+                >
+                  자세히 보기
+                </button>
+              </div>
             </div>
           </div>
         </header>
@@ -1898,15 +1908,24 @@ useEffect(() => {
             <SectionTitle
               eyebrow="Practice Console"
               title="연습 콘솔"
-              description="Minimal은 바로 칠 정보만, 자세한 분석은 Normal 또는 Study에서 확인."
+              description="연습은 바로 칠 정보만, 자세한 분석은 자세히 보기 또는 공부 모드에서 확인."
             />
 
-            <button
-              onClick={() => setPracticeModeEnabled(!practiceMode)}
-              className="rounded-lg border border-blue-900/30 bg-[#1E40AF] px-5 py-3 text-sm font-black text-white shadow-lg shadow-black/20 transition hover:bg-[#2563EB]"
-            >
-              {practiceMode ? "연습모드 끄기" : "연습모드 켜기"}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setDetailSheetOpen(true)}
+                className="rounded-lg border border-blue-900/30 bg-[#07111F] px-5 py-3 text-sm font-black text-[#CBD5E1] transition hover:border-blue-700/60 hover:bg-[#0B1730] hover:text-white"
+              >
+                자세히 보기
+              </button>
+              <button
+                onClick={() => setPracticeModeEnabled(!practiceMode)}
+                className="rounded-lg border border-blue-900/30 bg-[#1E40AF] px-5 py-3 text-sm font-black text-white shadow-lg shadow-black/20 transition hover:bg-[#2563EB]"
+              >
+                {practiceMode ? "연습모드 끄기" : "연습모드 켜기"}
+              </button>
+            </div>
           </div>
 
           <div className="mt-4 inline-grid rounded-lg border border-blue-900/30 bg-black/25 p-1 sm:grid-cols-2">
@@ -2799,7 +2818,128 @@ useEffect(() => {
           </section>
         )}
       </section>
+      <DetailSheet
+        open={detailSheetOpen}
+        onClose={() => setDetailSheetOpen(false)}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        progressionAnalysis={progressionAnalysis}
+        currentSoloScale={currentSoloScale}
+        currentPracticeItem={currentPracticeItem}
+        nextPracticeItem={nextPracticeItem}
+        bestVoicingPair={bestVoicingPair}
+        openSections={openStudySections}
+        onToggleSection={toggleStudySection}
+      />
     </main>
+  );
+}
+
+function DetailSheet({
+  open,
+  onClose,
+  viewMode,
+  onViewModeChange,
+  progressionAnalysis,
+  currentSoloScale,
+  currentPracticeItem,
+  nextPracticeItem,
+  bestVoicingPair,
+  openSections,
+  onToggleSection,
+}: {
+  open: boolean;
+  onClose: () => void;
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
+  progressionAnalysis: ProgressionAnalysis;
+  currentSoloScale: string[];
+  currentPracticeItem: PracticeItem | undefined;
+  nextPracticeItem: PracticeItem | undefined;
+  bestVoicingPair: VoicingPair | null;
+  openSections: TheorySectionId[];
+  onToggleSection: (sectionId: TheorySectionId) => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm md:items-stretch md:justify-end md:p-5"
+      onClick={onClose}
+    >
+      <aside
+        className="max-h-[88vh] w-full min-w-0 overflow-y-auto rounded-lg border border-blue-900/40 bg-[#050B16] shadow-2xl shadow-black/60 md:h-full md:max-h-none md:max-w-[620px]"
+        onClick={(event) => event.stopPropagation()}
+        aria-label="자세히 보기"
+      >
+        <div className="sticky top-0 z-10 border-b border-blue-900/30 bg-[#050B16]/95 p-4 backdrop-blur">
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase text-[#64748B]">
+                Detail
+              </p>
+              <h2 className="mt-1 text-2xl font-black text-[#E5E7EB]">
+                자세히 보기
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-[#94A3B8]">
+                연습 화면은 그대로 두고, 분석과 공부 정보만 따로 확인.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 rounded-md border border-blue-900/30 bg-[#07111F] px-3 py-2 text-xs font-black text-[#CBD5E1] transition hover:bg-[#0B1730] hover:text-white"
+            >
+              닫기
+            </button>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <ViewModeTabs viewMode={viewMode} onChange={onViewModeChange} />
+            <span className="rounded-md border border-blue-900/30 bg-[#02040A] px-3 py-2 text-xs font-bold text-[#64748B]">
+              {viewMode === "minimal"
+                ? "연습 중이면 여기만 열어보기"
+                : viewMode === "normal"
+                  ? "분석 요약 확인"
+                  : "공부용 상세 설명"}
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-4 p-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Info title="조성" value={progressionAnalysis.selectedKey} />
+            <Info
+              title="현재 코드"
+              value={currentPracticeItem?.symbol ?? "-"}
+            />
+            <Info title="다음 코드" value={nextPracticeItem?.symbol ?? "-"} />
+          </div>
+
+          <div className="rounded-lg border border-blue-900/30 bg-[#02040A] p-4">
+            <p className="text-xs font-black uppercase text-[#64748B]">
+              Progression
+            </p>
+            <p className="mt-2 break-words text-lg font-black text-[#E5E7EB]">
+              {progressionAnalysis.chordLine || "-"}
+            </p>
+            <p className="mt-1 break-words text-sm font-bold text-[#94A3B8]">
+              {progressionAnalysis.romanLine || "-"}
+            </p>
+          </div>
+
+          <TheoryAccordion
+            progressionAnalysis={progressionAnalysis}
+            currentSoloScale={currentSoloScale}
+            currentPracticeItem={currentPracticeItem}
+            nextPracticeItem={nextPracticeItem}
+            bestVoicingPair={bestVoicingPair}
+            openSections={openSections}
+            onToggle={onToggleSection}
+          />
+        </div>
+      </aside>
+    </div>
   );
 }
 
@@ -2866,6 +3006,7 @@ function ViewModeTabs({
       {(Object.keys(viewModeLabels) as ViewMode[]).map((mode) => (
         <button
           key={mode}
+          type="button"
           onClick={() => onChange(mode)}
           className={`rounded-md px-3 py-2 text-xs font-black transition ${
             viewMode === mode
@@ -3335,51 +3476,7 @@ function PracticePanel({
 
   if (focusMode) {
     return (
-      <section className="mt-5 min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#050B16] p-5 shadow-2xl shadow-black/30">
-        <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-black uppercase text-[#64748B]">
-              {trainingMode === "solo" ? "Focus Solo" : "Focus Practice"}
-            </p>
-            <h2 className="break-words text-6xl font-black tracking-tight text-white md:text-8xl">
-              {currentPracticeItem.symbol}
-            </h2>
-            <p className="mt-1 text-xl font-black text-[#94A3B8]">
-              {selectedKey} / {safeBpm} BPM
-            </p>
-          </div>
-
-          <div className="rounded-lg border border-blue-900/30 bg-[#0A1220] p-4 text-left md:text-right">
-            <p className="text-sm font-bold text-slate-400">박자</p>
-            <p className="text-4xl font-black text-[#E5E7EB]">
-              {beatInChord} / {safeBeatsPerChord}
-            </p>
-            <p className="mt-1 text-sm font-black text-[#94A3B8]">
-              {countInRemaining !== null
-                ? `카운트인 ${countInRemaining}`
-                : isAutoPlaying
-                  ? "재생 중"
-                  : "정지"}
-            </p>
-          </div>
-        </div>
-
-        <PlaybackStatusCard
-          safeBpm={safeBpm}
-          beatInChord={beatInChord}
-          safeBeatsPerChord={safeBeatsPerChord}
-          currentIndex={currentIndex}
-          totalCount={totalCount}
-          isAutoPlaying={isAutoPlaying}
-          countInEnabled={countInEnabled}
-          countInRemaining={countInRemaining}
-        />
-
-        <BeatBar
-          beatInChord={beatInChord}
-          safeBeatsPerChord={safeBeatsPerChord}
-        />
-
+      <section className="mt-5 min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#02040A] p-4 shadow-2xl shadow-black/40">
         <MinimalPracticeStrip
           currentPracticeItem={currentPracticeItem}
           nextPracticeItem={nextPracticeItem}
@@ -3396,20 +3493,27 @@ function PracticePanel({
           onTogglePlay={onTogglePlay}
         />
 
+        <BeatBar
+          beatInChord={beatInChord}
+          safeBeatsPerChord={safeBeatsPerChord}
+        />
+
         <PracticeStepToggle
           practiceStep={practiceStep}
           onChange={onPracticeStepChange}
         />
 
-        {showFullSoloPanel ? (
-          <SoloPracticePanel
-            currentPracticeItem={currentPracticeItem}
-            nextPracticeItem={nextPracticeItem}
-            selectedKeyRoot={selectedKeyRoot}
-            soloScaleNotes={soloScaleNotes}
-            currentIndex={currentIndex}
-          />
-        ) : bestVoicingPair ? (
+        <MinimalStepFocusCard
+          practiceStep={practiceStep}
+          currentSymbol={currentPracticeItem.symbol}
+          nextSymbol={nextPracticeItem?.symbol ?? "-"}
+          stepHint={stepHint}
+          rootHint={currentRootHint}
+          targetNote={soloRecommendation.targetNote}
+          resolveNotes={soloRecommendation.resolution}
+        />
+
+        {trainingMode === "chords" && practiceStep === "chord" && bestVoicingPair ? (
           <section className="mt-5 min-w-0">
             <div className="mx-auto grid max-w-[760px] gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center">
               <PracticeVoicingCard
@@ -3428,10 +3532,6 @@ function PracticePanel({
             </div>
           </section>
         ) : null}
-
-        {trainingMode === "chords" && bestVoicingPair && (
-          <NextMoveCard hint={focusMovementHint} />
-        )}
 
         <PracticeControls
           isAutoPlaying={isAutoPlaying}
@@ -3619,7 +3719,7 @@ function PracticePanel({
           )}
         </div>
 
-        {trainingMode === "solo" ? (
+        {showFullSoloPanel ? (
           <SoloPracticePanel
             currentPracticeItem={currentPracticeItem}
             nextPracticeItem={nextPracticeItem}
@@ -3891,7 +3991,7 @@ function MinimalStepFocusCard({
         {value}
       </p>
       <p className="mt-3 text-sm font-bold leading-6 text-[#64748B]">
-        자세한 보이싱, 프렛보드, 화성학 설명은 Normal 또는 Study에서 확인.
+        자세한 보이싱, 프렛보드, 화성학 설명은 자세히 보기 또는 공부 모드에서 확인.
       </p>
     </section>
   );
@@ -4009,19 +4109,6 @@ function PlaybackStatusCard({
           </p>
         </div>
       )}
-    </div>
-  );
-}
-
-function NextMoveCard({ hint }: { hint: string }) {
-  const cleanHint = hint.replace(/^NEXT MOVE:\s*/, "");
-
-  return (
-    <div className="mx-auto mt-3 max-w-[760px] rounded-lg border border-blue-900/30 bg-[#0A1220] p-3">
-      <p className="text-xs font-black uppercase text-[#64748B]">Next Move</p>
-      <p className="mt-1 text-sm font-black leading-6 text-[#CBD5E1]">
-        {cleanHint}
-      </p>
     </div>
   );
 }
