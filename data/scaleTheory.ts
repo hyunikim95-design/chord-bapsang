@@ -1,3 +1,4 @@
+import { Scale } from "tonal";
 import { getChordQualityKey } from "./chordTheory";
 
 export type ScaleTheoryProfile = {
@@ -9,6 +10,15 @@ export type ScaleTheoryProfile = {
   bestOver?: string[];
   avoidNotes?: string[];
   targetNotes?: string[];
+};
+
+export type RecommendedScaleChoice = {
+  profile: ScaleTheoryProfile;
+  root: string;
+  label: string;
+  notes: string[];
+  targetIntervals: string[];
+  practiceHint: string;
 };
 
 export const scaleTheoryProfiles: ScaleTheoryProfile[] = [
@@ -151,11 +161,159 @@ export const scaleTheoryProfiles: ScaleTheoryProfile[] = [
   },
 ];
 
-export function getRecommendedScaleProfilesForChord(symbol: string) {
-  const quality = getChordQualityKey(symbol);
-  const matches = scaleTheoryProfiles.filter((scale) =>
-    scale.bestOver?.includes(quality)
+const scalePriorityByQuality: Record<string, string[]> = {
+  major: ["Major pentatonic", "Major scale", "Lydian"],
+  maj7: ["Major scale", "Lydian", "Major pentatonic"],
+  maj9: ["Lydian", "Major scale", "Major pentatonic"],
+  "6": ["Major pentatonic", "Major scale"],
+  add9: ["Major pentatonic", "Major scale"],
+  minor: ["Minor pentatonic", "Natural minor", "Dorian"],
+  m7: ["Dorian", "Minor pentatonic", "Natural minor"],
+  m9: ["Dorian", "Natural minor", "Minor pentatonic"],
+  m6: ["Melodic minor", "Dorian", "Minor pentatonic"],
+  dominant7: ["Mixolydian", "Blues scale", "Altered scale"],
+  "9": ["Mixolydian", "Blues scale", "Half-whole diminished"],
+  "13": ["Mixolydian", "Blues scale", "Half-whole diminished"],
+  "7sus4": ["Mixolydian", "Blues scale"],
+  m7b5: ["Locrian", "Half-whole diminished"],
+  diminished: ["Locrian", "Half-whole diminished"],
+  dim7: ["Half-whole diminished"],
+  augmented: ["Whole tone", "Altered scale"],
+};
+
+const tonalScaleNameByProfileName: Record<string, string> = {
+  "Major scale": "major",
+  "Natural minor": "natural minor",
+  "Harmonic minor": "harmonic minor",
+  "Melodic minor": "melodic minor",
+  "Major pentatonic": "major pentatonic",
+  "Minor pentatonic": "minor pentatonic",
+  "Blues scale": "blues",
+  Dorian: "dorian",
+  Mixolydian: "mixolydian",
+  Lydian: "lydian",
+  Phrygian: "phrygian",
+  Locrian: "locrian",
+  "Altered scale": "altered",
+  "Whole tone": "whole tone",
+};
+
+const sharpChromaticNotes = [
+  "C",
+  "C#",
+  "D",
+  "D#",
+  "E",
+  "F",
+  "F#",
+  "G",
+  "G#",
+  "A",
+  "A#",
+  "B",
+];
+const flatChromaticNotes = [
+  "C",
+  "Db",
+  "D",
+  "Eb",
+  "E",
+  "F",
+  "Gb",
+  "G",
+  "Ab",
+  "A",
+  "Bb",
+  "B",
+];
+const notePitchClass: Record<string, number> = {
+  C: 0,
+  "C#": 1,
+  Db: 1,
+  D: 2,
+  "D#": 3,
+  Eb: 3,
+  E: 4,
+  F: 5,
+  "F#": 6,
+  Gb: 6,
+  G: 7,
+  "G#": 8,
+  Ab: 8,
+  A: 9,
+  "A#": 10,
+  Bb: 10,
+  B: 11,
+};
+const halfWholeDiminishedSteps = [0, 1, 3, 4, 6, 7, 9, 10];
+
+function getChordRoot(symbol: string) {
+  return symbol
+    .split("/")[0]
+    .trim()
+    .match(/^([A-G](?:#|b)?)/)?.[1] ?? "C";
+}
+
+function orderProfilesForQuality(quality: string) {
+  const priority = scalePriorityByQuality[quality];
+
+  if (!priority) {
+    return scaleTheoryProfiles.filter((scale) =>
+      scale.bestOver?.includes(quality)
+    );
+  }
+
+  const ordered = priority
+    .map((name) => scaleTheoryProfiles.find((scale) => scale.name === name))
+    .filter((scale): scale is ScaleTheoryProfile => Boolean(scale));
+  const extras = scaleTheoryProfiles.filter(
+    (scale) =>
+      scale.bestOver?.includes(quality) &&
+      !ordered.some((orderedScale) => orderedScale.name === scale.name)
   );
 
+  return [...ordered, ...extras];
+}
+
+export function getScaleNotesForProfile(root: string, profileName: string) {
+  if (profileName === "Half-whole diminished") {
+    const rootPitch = notePitchClass[root] ?? 0;
+    const names = root.includes("b") ? flatChromaticNotes : sharpChromaticNotes;
+
+    return halfWholeDiminishedSteps.map(
+      (step) => names[(rootPitch + step) % 12]
+    );
+  }
+
+  const tonalName = tonalScaleNameByProfileName[profileName] ?? profileName;
+  return Scale.get(`${root} ${tonalName}`).notes;
+}
+
+function getScalePracticeHint(profile: ScaleTheoryProfile) {
+  const target = profile.targetNotes?.join(", ") ?? "3도";
+  const avoid = profile.avoidNotes?.length
+    ? ` 피하고 싶은 음은 ${profile.avoidNotes.join(", ")}.`
+    : "";
+
+  return `${target}를 먼저 착지음으로 잡고 짧은 2마디 문장으로 반복.${avoid}`;
+}
+
+export function getRecommendedScaleProfilesForChord(symbol: string) {
+  const quality = getChordQualityKey(symbol);
+  const matches = orderProfilesForQuality(quality);
+
   return matches.length > 0 ? matches.slice(0, 3) : scaleTheoryProfiles.slice(0, 2);
+}
+
+export function getRecommendedScaleChoicesForChord(symbol: string) {
+  const root = getChordRoot(symbol);
+
+  return getRecommendedScaleProfilesForChord(symbol).map((profile) => ({
+    profile,
+    root,
+    label: `${root} ${profile.name}`,
+    notes: getScaleNotesForProfile(root, profile.name),
+    targetIntervals: profile.targetNotes ?? [],
+    practiceHint: getScalePracticeHint(profile),
+  }));
 }

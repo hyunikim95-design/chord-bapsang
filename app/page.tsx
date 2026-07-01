@@ -14,7 +14,9 @@ import { FretboardMap as SoloFretboardMap } from "../components/FretboardMap";
 import { chordDescriptions } from "../data/chordDescriptions";
 import { getGuitarVoicings, type GuitarVoicing } from "../data/guitarVoicings";
 import { practicePresets, type PracticePreset } from "../data/practicePresets";
-import { getRecommendedScaleProfilesForChord } from "../data/scaleTheory";
+import {
+  getRecommendedScaleChoicesForChord,
+} from "../data/scaleTheory";
 import {
   areSamePitch as areSamePitchClass,
   getNoteNameAtFret,
@@ -1174,7 +1176,13 @@ const [favoriteTitleInput, setFavoriteTitleInput] = useState("");
   const currentDroneRoot = currentPracticeItem
     ? getChordRootSymbol(currentPracticeItem.symbol)
     : selectedKeyRoot;
-  const currentSoloScale = getMajorScaleNotes(selectedKeyRoot);
+  const currentSoloScaleChoices = currentPracticeItem
+    ? getRecommendedScaleChoicesForChord(currentPracticeItem.symbol)
+    : [];
+  const currentSoloScale =
+    currentSoloScaleChoices[0]?.notes.length
+      ? currentSoloScaleChoices[0].notes
+      : getMajorScaleNotes(selectedKeyRoot);
   const dailyPracticePreset = practicePresets[getDailyPresetIndex()];
   const filteredPracticePresets =
   selectedPresetCategory === "all"
@@ -3087,8 +3095,8 @@ function TheoryAccordion({
   const chordTheoryProfile = currentPracticeItem
     ? getChordTheoryProfile(currentPracticeItem.symbol)
     : null;
-  const recommendedScales = currentPracticeItem
-    ? getRecommendedScaleProfilesForChord(currentPracticeItem.symbol)
+  const recommendedScaleChoices = currentPracticeItem
+    ? getRecommendedScaleChoicesForChord(currentPracticeItem.symbol)
     : [];
   const rhythmPrompt = soloRhythmPrompts[
     (currentPracticeItem?.index ?? 0) % soloRhythmPrompts.length
@@ -3241,8 +3249,8 @@ function TheoryAccordion({
       id: "scales",
       title: "관련 스케일",
       summary:
-        recommendedScales.length > 0
-          ? recommendedScales.map((scale) => scale.name).join(", ")
+        recommendedScaleChoices.length > 0
+          ? recommendedScaleChoices.map((scale) => scale.label).join(", ")
           : `${progressionAnalysis.selectedKeyRoot} major`,
       content: (
         <div className="space-y-4">
@@ -3258,12 +3266,34 @@ function TheoryAccordion({
           </div>
 
           <div className="grid gap-3 md:grid-cols-3">
-            {recommendedScales.map((scale) => (
-              <TheoryMiniRow
-                key={scale.name}
-                title={`${currentPracticeItem?.notes[0] ?? progressionAnalysis.selectedKeyRoot} ${scale.name}`}
-                value={`${scale.koreanName}: ${scale.usage} 타겟 ${scale.targetNotes?.join(", ") ?? "-"}`}
-              />
+            {recommendedScaleChoices.map((choice) => (
+              <div
+                key={choice.label}
+                className="min-w-0 rounded-lg border border-blue-900/30 bg-[#07111F] p-3"
+              >
+                <p className="break-words text-sm font-black text-[#E5E7EB]">
+                  {choice.label}
+                </p>
+                <p className="mt-1 break-words text-xs font-bold text-[#94A3B8]">
+                  {choice.profile.koreanName} / {choice.profile.usage}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {choice.notes.map((note) => (
+                    <span
+                      key={`${choice.label}-${note}`}
+                      className="rounded-md border border-blue-900/30 bg-[#0B1730] px-2 py-1 text-xs font-black text-[#CBD5E1]"
+                    >
+                      {note}
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-2 break-words text-xs font-bold text-[#FBBF24]">
+                  타겟: {choice.targetIntervals.join(", ") || "-"}
+                </p>
+                <p className="mt-1 break-words text-xs font-bold leading-5 text-[#94A3B8]">
+                  {choice.practiceHint}
+                </p>
+              </div>
             ))}
           </div>
         </div>
@@ -4182,6 +4212,12 @@ function SoloPracticePanel({
     rhythmPrompt,
     constraintPrompt
   );
+  const recommendedScaleChoices = getRecommendedScaleChoicesForChord(
+    currentPracticeItem.symbol
+  );
+  const primaryScaleChoice = recommendedScaleChoices[0];
+  const activeSoloScale =
+    primaryScaleChoice?.notes.length ? primaryScaleChoice.notes : soloScaleNotes;
   const soloQuality = getChordQualityKey(currentPracticeItem.symbol);
   const soloApproach =
     soloQuality === "dominant7"
@@ -4221,9 +4257,31 @@ function SoloPracticePanel({
       </div>
 
       <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-3">
-        <SoloInfoBlock title="스케일" notes={soloScaleNotes} />
+        <SoloInfoBlock
+          title={primaryScaleChoice?.label ?? "스케일"}
+          notes={activeSoloScale}
+        />
         <SoloInfoBlock title="현재 코드톤" notes={chordTones} />
         <SoloInfoBlock title="다음 착지 후보" notes={resolveNotes} />
+      </div>
+
+      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-3">
+        {recommendedScaleChoices.map((choice) => (
+          <div
+            key={`solo-scale-${choice.label}`}
+            className="min-w-0 rounded-lg border border-blue-900/30 bg-[#050B16] p-3"
+          >
+            <p className="break-words text-sm font-black text-[#E5E7EB]">
+              {choice.label}
+            </p>
+            <p className="mt-1 break-words text-xs font-bold text-[#94A3B8]">
+              {choice.profile.koreanName} / {choice.profile.mood}
+            </p>
+            <p className="mt-2 break-words text-xs font-bold leading-5 text-[#FBBF24]">
+              {choice.practiceHint}
+            </p>
+          </div>
+        ))}
       </div>
 
       <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -4289,7 +4347,7 @@ function SoloPracticePanel({
           keyRoot={selectedKeyRoot}
           currentChordSymbol={currentPracticeItem.symbol}
           currentChordNotes={chordTones}
-          scaleNotes={soloScaleNotes}
+          scaleNotes={activeSoloScale}
           targetNotes={targetNotes}
           resolveNotes={resolveNotes}
           mode="solo"

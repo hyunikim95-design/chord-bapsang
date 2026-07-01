@@ -340,7 +340,7 @@ export function FretboardMap({
   mode,
 }: FretboardMapProps) {
   const [displayMode, setDisplayMode] =
-    useState<FretboardDisplayMode>("all");
+    useState<FretboardDisplayMode>(() => (mode === "solo" ? "target" : "all"));
   const rootNote = currentChordNotes[0] ?? getChordRootSymbol(currentChordSymbol);
   const thirdNote = currentChordNotes[1];
   const fifthNote = currentChordNotes[2];
@@ -530,6 +530,11 @@ export function FretboardMap({
           <h4 className="mt-1 max-w-full break-words text-lg font-black text-[#E5E7EB] md:text-xl">
             {keyRoot} major / {currentChordSymbol}
           </h4>
+          {mode === "solo" && (
+            <p className="mt-1 break-words text-xs font-bold text-[#94A3B8]">
+              기본은 타겟/해결음만 표시하고, 스케일 버튼을 누르면 전체 음계를 펼칩니다.
+            </p>
+          )}
         </div>
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           <FretboardToggleBar
