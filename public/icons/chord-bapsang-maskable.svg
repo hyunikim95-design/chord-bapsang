@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">코드밥상</title>
+  <rect width="512" height="512" fill="#02040A"/>
+  <circle cx="256" cy="256" r="226" fill="#07111F" stroke="#1E40AF" stroke-width="14"/>
+  <path d="M154 126h204c17 0 30 13 30 30v200c0 17-13 30-30 30H154c-17 0-30-13-30-30V156c0-17 13-30 30-30Z" fill="#0A1220" stroke="#1D4ED8" stroke-width="8"/>
+  <path d="M176 190h160M176 242h160M176 294h160" stroke="#334155" stroke-width="14" stroke-linecap="round"/>
+  <path d="M204 166v184M256 166v184M308 166v184" stroke="#1E40AF" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="204" cy="242" r="30" fill="#F59E0B" stroke="#FBBF24" stroke-width="8"/>
+  <circle cx="256" cy="190" r="23" fill="#2563EB" stroke="#93C5FD" stroke-width="6"/>
+  <circle cx="308" cy="294" r="23" fill="#10B981" stroke="#A7F3D0" stroke-width="6"/>
+</svg>
