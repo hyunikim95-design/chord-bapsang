@@ -317,3 +317,16 @@ export function getRecommendedScaleChoicesForChord(symbol: string) {
     practiceHint: getScalePracticeHint(profile),
   }));
 }
+
+export function getSelectableScaleChoicesForChord(symbol: string) {
+  const root = getChordRoot(symbol);
+
+  return scaleTheoryProfiles.map((profile) => ({
+    profile,
+    root,
+    label: `${root} ${profile.name}`,
+    notes: getScaleNotesForProfile(root, profile.name),
+    targetIntervals: profile.targetNotes ?? [],
+    practiceHint: getScalePracticeHint(profile),
+  }));
+}

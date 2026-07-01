@@ -16,6 +16,8 @@ import { getGuitarVoicings, type GuitarVoicing } from "../data/guitarVoicings";
 import { practicePresets, type PracticePreset } from "../data/practicePresets";
 import {
   getRecommendedScaleChoicesForChord,
+  getSelectableScaleChoicesForChord,
+  type RecommendedScaleChoice,
 } from "../data/scaleTheory";
 import {
   areSamePitch as areSamePitchClass,
@@ -1106,6 +1108,7 @@ export default function Home() {
   const [trainingMode, setTrainingMode] = useState<TrainingMode>("chords");
   const [viewMode, setViewMode] = useState<ViewMode>("minimal");
   const [practiceStep, setPracticeStep] = useState<PracticeStep>("chord");
+  const [selectedSoloScaleName, setSelectedSoloScaleName] = useState("auto");
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
   const [openStudySections, setOpenStudySections] = useState<TheorySectionId[]>(
     defaultOpenStudySections
@@ -1179,9 +1182,20 @@ const [favoriteTitleInput, setFavoriteTitleInput] = useState("");
   const currentSoloScaleChoices = currentPracticeItem
     ? getRecommendedScaleChoicesForChord(currentPracticeItem.symbol)
     : [];
+  const selectableSoloScaleChoices = currentPracticeItem
+    ? getSelectableScaleChoicesForChord(currentPracticeItem.symbol)
+    : [];
+  const selectedManualSoloScaleChoice =
+    selectedSoloScaleName === "auto"
+      ? undefined
+      : selectableSoloScaleChoices.find(
+          (choice) => choice.profile.name === selectedSoloScaleName
+        );
+  const selectedSoloScaleChoice =
+    selectedManualSoloScaleChoice ?? currentSoloScaleChoices[0];
   const currentSoloScale =
-    currentSoloScaleChoices[0]?.notes.length
-      ? currentSoloScaleChoices[0].notes
+    selectedSoloScaleChoice?.notes.length
+      ? selectedSoloScaleChoice.notes
       : getMajorScaleNotes(selectedKeyRoot);
   const dailyPracticePreset = practicePresets[getDailyPresetIndex()];
   const filteredPracticePresets =
@@ -2015,6 +2029,9 @@ useEffect(() => {
               selectedKey={progressionAnalysis.selectedKey}
               selectedKeyRoot={selectedKeyRoot}
               soloScaleNotes={currentSoloScale}
+              selectedSoloScaleName={selectedSoloScaleName}
+              selectedSoloScaleChoice={selectedSoloScaleChoice}
+              selectableSoloScaleChoices={selectableSoloScaleChoices}
               beatInChord={beatInChord}
               safeBpm={safeBpm}
               safeBeatsPerChord={safeBeatsPerChord}
@@ -2030,6 +2047,7 @@ useEffect(() => {
               bestVoicingPair={bestVoicingPair}
               focusMode={focusMode}
               onPracticeStepChange={setPracticeStep}
+              onSelectedSoloScaleNameChange={setSelectedSoloScaleName}
               onToggleFocusMode={() => setFocusMode((prev) => !prev)}
               onPrev={goPrevChord}
               onNext={goNextChord}
@@ -2606,6 +2624,7 @@ useEffect(() => {
             <TheoryAccordion
               progressionAnalysis={progressionAnalysis}
               currentSoloScale={currentSoloScale}
+              selectedSoloScaleChoice={selectedSoloScaleChoice}
               currentPracticeItem={currentPracticeItem}
               nextPracticeItem={nextPracticeItem}
               bestVoicingPair={bestVoicingPair}
@@ -2873,6 +2892,7 @@ useEffect(() => {
         onViewModeChange={setViewMode}
         progressionAnalysis={progressionAnalysis}
         currentSoloScale={currentSoloScale}
+        selectedSoloScaleChoice={selectedSoloScaleChoice}
         currentPracticeItem={currentPracticeItem}
         nextPracticeItem={nextPracticeItem}
         bestVoicingPair={bestVoicingPair}
@@ -2890,6 +2910,7 @@ function DetailSheet({
   onViewModeChange,
   progressionAnalysis,
   currentSoloScale,
+  selectedSoloScaleChoice,
   currentPracticeItem,
   nextPracticeItem,
   bestVoicingPair,
@@ -2902,6 +2923,7 @@ function DetailSheet({
   onViewModeChange: (mode: ViewMode) => void;
   progressionAnalysis: ProgressionAnalysis;
   currentSoloScale: string[];
+  selectedSoloScaleChoice: RecommendedScaleChoice | undefined;
   currentPracticeItem: PracticeItem | undefined;
   nextPracticeItem: PracticeItem | undefined;
   bestVoicingPair: VoicingPair | null;
@@ -2979,6 +3001,7 @@ function DetailSheet({
           <TheoryAccordion
             progressionAnalysis={progressionAnalysis}
             currentSoloScale={currentSoloScale}
+            selectedSoloScaleChoice={selectedSoloScaleChoice}
             currentPracticeItem={currentPracticeItem}
             nextPracticeItem={nextPracticeItem}
             bestVoicingPair={bestVoicingPair}
@@ -3072,6 +3095,7 @@ function ViewModeTabs({
 function TheoryAccordion({
   progressionAnalysis,
   currentSoloScale,
+  selectedSoloScaleChoice,
   currentPracticeItem,
   nextPracticeItem,
   bestVoicingPair,
@@ -3080,6 +3104,7 @@ function TheoryAccordion({
 }: {
   progressionAnalysis: ProgressionAnalysis;
   currentSoloScale: string[];
+  selectedSoloScaleChoice?: RecommendedScaleChoice;
   currentPracticeItem: PracticeItem | undefined;
   nextPracticeItem: PracticeItem | undefined;
   bestVoicingPair: VoicingPair | null;
@@ -3249,11 +3274,27 @@ function TheoryAccordion({
       id: "scales",
       title: "관련 스케일",
       summary:
-        recommendedScaleChoices.length > 0
-          ? recommendedScaleChoices.map((scale) => scale.label).join(", ")
+        selectedSoloScaleChoice
+          ? selectedSoloScaleChoice.label
+          : recommendedScaleChoices.length > 0
+            ? recommendedScaleChoices.map((scale) => scale.label).join(", ")
           : `${progressionAnalysis.selectedKeyRoot} major`,
       content: (
         <div className="space-y-4">
+          {selectedSoloScaleChoice && (
+            <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 p-3">
+              <p className="text-xs font-black uppercase text-[#92400E]">
+                Selected Scale
+              </p>
+              <p className="mt-1 break-words text-sm font-black text-[#FBBF24]">
+                {selectedSoloScaleChoice.label}
+              </p>
+              <p className="mt-1 break-words text-xs font-bold leading-5 text-[#CBD5E1]">
+                {selectedSoloScaleChoice.profile.usage}
+              </p>
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2">
             {currentSoloScale.map((note) => (
               <span
@@ -3451,6 +3492,9 @@ function PracticePanel({
   selectedKey,
   selectedKeyRoot,
   soloScaleNotes,
+  selectedSoloScaleName,
+  selectedSoloScaleChoice,
+  selectableSoloScaleChoices,
   beatInChord,
   safeBpm,
   safeBeatsPerChord,
@@ -3466,6 +3510,7 @@ function PracticePanel({
   bestVoicingPair,
   focusMode,
   onPracticeStepChange,
+  onSelectedSoloScaleNameChange,
   onToggleFocusMode,
   onPrev,
   onNext,
@@ -3482,6 +3527,9 @@ function PracticePanel({
   selectedKey: string;
   selectedKeyRoot: string;
   soloScaleNotes: string[];
+  selectedSoloScaleName: string;
+  selectedSoloScaleChoice: RecommendedScaleChoice | undefined;
+  selectableSoloScaleChoices: RecommendedScaleChoice[];
   beatInChord: number;
   safeBpm: number;
   safeBeatsPerChord: number;
@@ -3497,6 +3545,7 @@ function PracticePanel({
   bestVoicingPair: VoicingPair | null;
   focusMode: boolean;
   onPracticeStepChange: (step: PracticeStep) => void;
+  onSelectedSoloScaleNameChange: (scaleName: string) => void;
   onToggleFocusMode: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -3795,6 +3844,10 @@ function PracticePanel({
             nextPracticeItem={nextPracticeItem}
             selectedKeyRoot={selectedKeyRoot}
             soloScaleNotes={soloScaleNotes}
+            selectedSoloScaleName={selectedSoloScaleName}
+            selectedSoloScaleChoice={selectedSoloScaleChoice}
+            selectableSoloScaleChoices={selectableSoloScaleChoices}
+            onSelectedSoloScaleNameChange={onSelectedSoloScaleNameChange}
             currentIndex={currentIndex}
           />
         ) : showBestMovePanel && bestVoicingPair ? (
@@ -4188,6 +4241,10 @@ function SoloPracticePanel({
   nextPracticeItem,
   selectedKeyRoot,
   soloScaleNotes,
+  selectedSoloScaleName,
+  selectedSoloScaleChoice,
+  selectableSoloScaleChoices,
+  onSelectedSoloScaleNameChange,
   currentIndex,
   compact = false,
 }: {
@@ -4195,6 +4252,10 @@ function SoloPracticePanel({
   nextPracticeItem: PracticeItem | undefined;
   selectedKeyRoot: string;
   soloScaleNotes: string[];
+  selectedSoloScaleName: string;
+  selectedSoloScaleChoice: RecommendedScaleChoice | undefined;
+  selectableSoloScaleChoices: RecommendedScaleChoice[];
+  onSelectedSoloScaleNameChange: (scaleName: string) => void;
   currentIndex: number;
   compact?: boolean;
 }) {
@@ -4215,7 +4276,7 @@ function SoloPracticePanel({
   const recommendedScaleChoices = getRecommendedScaleChoicesForChord(
     currentPracticeItem.symbol
   );
-  const primaryScaleChoice = recommendedScaleChoices[0];
+  const primaryScaleChoice = selectedSoloScaleChoice ?? recommendedScaleChoices[0];
   const activeSoloScale =
     primaryScaleChoice?.notes.length ? primaryScaleChoice.notes : soloScaleNotes;
   const soloQuality = getChordQualityKey(currentPracticeItem.symbol);
@@ -4255,6 +4316,14 @@ function SoloPracticePanel({
           목표음 {soloRecommendation.targetNote}
         </span>
       </div>
+
+      <SoloScaleSelector
+        selectedScaleName={selectedSoloScaleName}
+        selectedScaleChoice={primaryScaleChoice}
+        selectableScaleChoices={selectableSoloScaleChoices}
+        recommendedScaleChoices={recommendedScaleChoices}
+        onChange={onSelectedSoloScaleNameChange}
+      />
 
       <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-3">
         <SoloInfoBlock
@@ -4369,6 +4438,84 @@ function SoloInfoBlock({ title, notes }: { title: string; notes: string[] }) {
           >
             {note}
           </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SoloScaleSelector({
+  selectedScaleName,
+  selectedScaleChoice,
+  selectableScaleChoices,
+  recommendedScaleChoices,
+  onChange,
+}: {
+  selectedScaleName: string;
+  selectedScaleChoice: RecommendedScaleChoice | undefined;
+  selectableScaleChoices: RecommendedScaleChoice[];
+  recommendedScaleChoices: RecommendedScaleChoice[];
+  onChange: (scaleName: string) => void;
+}) {
+  return (
+    <div className="mt-4 min-w-0 rounded-lg border border-blue-900/30 bg-[#050B16] p-3">
+      <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-black uppercase text-[#64748B]">
+            Scale Select
+          </p>
+          <p className="mt-1 break-words text-sm font-black text-[#E5E7EB]">
+            {selectedScaleName === "auto"
+              ? `Auto 추천: ${selectedScaleChoice?.label ?? "-"}`
+              : selectedScaleChoice?.label ?? "선택한 스케일"}
+          </p>
+          <p className="mt-1 break-words text-xs font-bold leading-5 text-[#94A3B8]">
+            메이저/마이너 펜타토닉, 블루스, 모드 계열을 직접 골라 프렛보드에 표시합니다.
+          </p>
+        </div>
+
+        <label className="min-w-0 lg:min-w-[260px]">
+          <span className="sr-only">솔로 스케일 선택</span>
+          <select
+            value={selectedScaleName}
+            onChange={(event) => onChange(event.target.value)}
+            className="w-full rounded-lg border border-blue-900/40 bg-[#02040A] px-3 py-2.5 text-sm font-black text-[#E5E7EB] outline-none transition focus:border-[#1D4ED8] focus:ring-2 focus:ring-blue-900/50"
+          >
+            <option value="auto">Auto 추천</option>
+            {selectableScaleChoices.map((choice) => (
+              <option key={choice.profile.name} value={choice.profile.name}>
+                {choice.profile.koreanName} / {choice.profile.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="mt-3 flex min-w-0 flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => onChange("auto")}
+          className={`rounded-md border px-3 py-2 text-xs font-black transition ${
+            selectedScaleName === "auto"
+              ? "border-amber-300/50 bg-amber-500/15 text-[#FBBF24]"
+              : "border-blue-900/30 bg-[#07111F] text-[#94A3B8] hover:bg-[#0B1730] hover:text-[#E5E7EB]"
+          }`}
+        >
+          Auto
+        </button>
+        {recommendedScaleChoices.map((choice) => (
+          <button
+            key={`quick-${choice.profile.name}`}
+            type="button"
+            onClick={() => onChange(choice.profile.name)}
+            className={`rounded-md border px-3 py-2 text-xs font-black transition ${
+              selectedScaleName === choice.profile.name
+                ? "border-blue-500/50 bg-[#1E40AF] text-white"
+                : "border-blue-900/30 bg-[#07111F] text-[#94A3B8] hover:bg-[#0B1730] hover:text-[#E5E7EB]"
+            }`}
+          >
+            {choice.profile.koreanName}
+          </button>
         ))}
       </div>
     </div>
