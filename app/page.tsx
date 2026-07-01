@@ -854,54 +854,6 @@ function getSoloTargetRecommendation(
   };
 }
 
-function getSoloPracticeBrief({
-  currentItem,
-  nextItem,
-  targetNote,
-  resolution,
-  rhythmPrompt,
-}: {
-  currentItem: PracticeItem;
-  nextItem: PracticeItem | undefined;
-  targetNote: string;
-  resolution: string;
-  rhythmPrompt: string;
-}) {
-  const quality = getChordQualityKey(currentItem.symbol);
-  const nextLabel = nextItem?.symbol ?? "다음 코드";
-  const resolveLabel = resolution || nextItem?.notes[0] || "안정음";
-
-  if (quality === "dominant7") {
-    return [
-      `${targetNote}을 먼저 찾아 도미넌트 긴장 만들기`,
-      "3도 또는 b7을 중심으로 짧게 반복하기",
-      `${nextLabel}에서 ${resolveLabel}로 해결하기`,
-    ];
-  }
-
-  if (quality === "maj7" || quality === "maj9") {
-    return [
-      `루트보다 ${targetNote}을 먼저 들리게 하기`,
-      "긴 음 하나를 남겨 부드럽게 연결하기",
-      `${nextLabel}로 넘어가기 전 7도 색채 유지하기`,
-    ];
-  }
-
-  if (quality === "m7" || quality === "m9" || quality === "m7b5") {
-    return [
-      `${targetNote} 중심으로 마이너 색 잡기`,
-      "짧은 두 마디 프레이즈 하나 만들기",
-      `${nextLabel}의 타겟 노트로 자연스럽게 연결하기`,
-    ];
-  }
-
-  return [
-    `${targetNote}을 첫 착지음으로 정하기`,
-    rhythmPrompt,
-    `${nextLabel}에서 ${resolveLabel} 후보로 마무리하기`,
-  ];
-}
-
 function getMajorScaleNotes(key: string) {
   const keyIndex = getNoteIndex(key);
   const outputNotes = getOutputNoteNames(key);
@@ -3771,7 +3723,16 @@ function PracticePanel({
               trainingMode === "solo" ? "sm:grid-cols-2 xl:grid-cols-1" : "sm:grid-cols-2 lg:grid-cols-1"
             }`}
           >
-            {practiceStep === "chord" && (
+            {trainingMode === "solo" ? (
+              <>
+                <PracticeMiniCard title="타겟" value={soloRecommendation.targetNote} />
+                <PracticeMiniCard
+                  title="스케일"
+                  value={selectedSoloScaleChoice?.label ?? "Auto 추천"}
+                />
+                <PracticeMiniCard title="착지" value={soloRecommendation.resolution} />
+              </>
+            ) : practiceStep === "chord" && (
               <>
                 <PracticeMiniCard title="다음 코드" value={nextPracticeItem?.symbol ?? "-"} />
                 <PracticeMiniCard
@@ -3785,13 +3746,13 @@ function PracticePanel({
                 <PracticeMiniCard title="이동 힌트" value={focusMovementHint} />
               </>
             )}
-            {practiceStep === "root" && (
+            {trainingMode !== "solo" && practiceStep === "root" && (
               <>
                 <PracticeMiniCard title="현재 루트" value={currentRootHint} />
                 <PracticeMiniCard title="다음 루트" value={nextRootHint || "-"} />
               </>
             )}
-            {practiceStep === "rhythm" && (
+            {trainingMode !== "solo" && practiceStep === "rhythm" && (
               <>
                 <PracticeMiniCard title="BPM / 박자" value={`${safeBpm} / ${safeBeatsPerChord}`} />
                 <PracticeMiniCard
@@ -3812,7 +3773,7 @@ function PracticePanel({
                 />
               </>
             )}
-            {practiceStep === "solo" && (
+            {trainingMode !== "solo" && practiceStep === "solo" && (
               <>
                 <PracticeMiniCard title="타겟 노트" value={soloRecommendation.targetNote} />
                 <PracticeMiniCard title="착지 후보" value={soloRecommendation.resolution} />
@@ -4279,28 +4240,11 @@ function SoloPracticePanel({
   const primaryScaleChoice = selectedSoloScaleChoice ?? recommendedScaleChoices[0];
   const activeSoloScale =
     primaryScaleChoice?.notes.length ? primaryScaleChoice.notes : soloScaleNotes;
-  const soloQuality = getChordQualityKey(currentPracticeItem.symbol);
-  const soloApproach =
-    soloQuality === "dominant7"
-      ? `아래 반음에서 ${soloRecommendation.targetNote}으로 접근`
-      : soloQuality === "maj7" || soloQuality === "maj9"
-        ? `루트보다 ${soloRecommendation.targetNote}을 먼저 노리기`
-        : soloQuality === "m7" || soloQuality === "m9" || soloQuality === "m7b5"
-          ? `b3/b7 후보 ${soloRecommendation.alternateTargets.join(", ")} 확인`
-          : `3도 ${soloRecommendation.targetNote}을 중심으로 시작`;
   const soloResolution = `다음 코드에서 ${soloRecommendation.resolution} 착지`;
   const resolveNotes = soloRecommendation.resolutionCandidates;
   const targetNotes = soloRecommendation.alternateTargets.length
     ? soloRecommendation.alternateTargets
     : [soloRecommendation.targetNote];
-  const practiceBrief = getSoloPracticeBrief({
-    currentItem: currentPracticeItem,
-    nextItem: nextPracticeItem,
-    targetNote: soloRecommendation.targetNote,
-    resolution: soloRecommendation.resolution,
-    rhythmPrompt,
-  });
-
   return (
     <section className="min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-black/25 p-4">
       <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -4325,87 +4269,6 @@ function SoloPracticePanel({
         onChange={onSelectedSoloScaleNameChange}
       />
 
-      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-3">
-        <SoloInfoBlock
-          title={primaryScaleChoice?.label ?? "스케일"}
-          notes={activeSoloScale}
-        />
-        <SoloInfoBlock title="현재 코드톤" notes={chordTones} />
-        <SoloInfoBlock title="다음 착지 후보" notes={resolveNotes} />
-      </div>
-
-      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-3">
-        {recommendedScaleChoices.map((choice) => (
-          <div
-            key={`solo-scale-${choice.label}`}
-            className="min-w-0 rounded-lg border border-blue-900/30 bg-[#050B16] p-3"
-          >
-            <p className="break-words text-sm font-black text-[#E5E7EB]">
-              {choice.label}
-            </p>
-            <p className="mt-1 break-words text-xs font-bold text-[#94A3B8]">
-              {choice.profile.koreanName} / {choice.profile.mood}
-            </p>
-            <p className="mt-2 break-words text-xs font-bold leading-5 text-[#FBBF24]">
-              {choice.practiceHint}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <PracticeMiniCard title="현재 코드" value={currentPracticeItem.symbol} />
-        <PracticeMiniCard title="타겟 노트" value={soloRecommendation.targetNote} />
-        <PracticeMiniCard title="해결 후보" value={soloRecommendation.resolution} />
-        <PracticeMiniCard title="추천 이유" value={soloRecommendation.reason} />
-      </div>
-
-      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
-        <PracticeMiniCard title="리듬 제한" value={rhythmPrompt} />
-        <PracticeMiniCard title="연습 과제" value={soloRecommendation.exercise} />
-      </div>
-
-      <div className="mt-4 min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#0A1220] p-3">
-        <p className="text-xs font-black uppercase text-[#64748B]">
-          Solo Mission
-        </p>
-        <div className="mt-3 grid min-w-0 gap-2 text-sm font-black leading-6">
-          <p className="break-words text-[#CBD5E1]">
-            타겟{" "}
-            <span style={{ color: TARGET_NOTE_COLOR }}>
-              {soloRecommendation.targetNote}
-            </span>
-          </p>
-          <p className="break-words text-[#94A3B8]">접근: {soloApproach}</p>
-          <p className="break-words text-[#94A3B8]">해결: {soloResolution}</p>
-          <p className="break-words text-[#A7F3D0]">
-            착지 후보: {resolveNotes.length > 0 ? resolveNotes.join(", ") : "-"}
-          </p>
-          <p className="break-words text-[#94A3B8]">리듬: {rhythmPrompt}</p>
-        </div>
-      </div>
-
-      <div className="mt-4 min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#050B16] p-3">
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-[#64748B]">
-          Practice Brief
-        </p>
-        <div className="mt-3 grid min-w-0 gap-2 md:grid-cols-3">
-          {practiceBrief.map((step, index) => (
-            <div
-              key={`${currentPracticeItem.symbol}-brief-${index}`}
-              className="min-w-0 rounded-md border border-blue-900/30 bg-[#0A1220] p-3"
-            >
-              <p className="text-xs font-black text-[#64748B]">
-                STEP {index + 1}
-              </p>
-              <p className="mt-1 break-words text-sm font-black leading-6 text-[#CBD5E1]">
-                {step}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {compact ? (
         <p className="mt-4 break-words rounded-lg border border-blue-900/30 bg-[#050B16] p-3 text-sm font-bold leading-6 text-[#94A3B8]">
           집중모드에서는 큰 프렛보드 맵을 접고 타겟 노트와 해결 후보만
@@ -4422,6 +4285,37 @@ function SoloPracticePanel({
           mode="solo"
         />
       )}
+
+      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-3">
+        <SoloInfoBlock
+          title={primaryScaleChoice?.label ?? "스케일"}
+          notes={activeSoloScale}
+        />
+        <SoloInfoBlock title="코드톤" notes={chordTones} />
+        <SoloInfoBlock title="착지 후보" notes={resolveNotes} />
+      </div>
+
+      <div className="mt-4 min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#0A1220] p-3">
+        <p className="text-xs font-black uppercase text-[#64748B]">
+          Solo Mission
+        </p>
+        <div className="mt-3 grid min-w-0 gap-2 text-sm font-black leading-6">
+          <p className="break-words text-[#CBD5E1]">
+            타겟{" "}
+            <span style={{ color: TARGET_NOTE_COLOR }}>
+              {soloRecommendation.targetNote}
+            </span>
+          </p>
+          <p className="break-words text-[#94A3B8]">
+            스케일: {primaryScaleChoice?.label ?? "Auto 추천"}
+          </p>
+          <p className="break-words text-[#94A3B8]">해결: {soloResolution}</p>
+          <p className="break-words text-[#A7F3D0]">
+            착지 후보: {resolveNotes.length > 0 ? resolveNotes.join(", ") : "-"}
+          </p>
+          <p className="break-words text-[#94A3B8]">과제: {soloRecommendation.exercise}</p>
+        </div>
+      </div>
     </section>
   );
 }
