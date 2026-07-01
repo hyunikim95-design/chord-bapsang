@@ -4286,55 +4286,22 @@ function SoloPracticePanel({
         />
       )}
 
-      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-3">
-        <SoloInfoBlock
-          title={primaryScaleChoice?.label ?? "스케일"}
-          notes={activeSoloScale}
-        />
-        <SoloInfoBlock title="코드톤" notes={chordTones} />
-        <SoloInfoBlock title="착지 후보" notes={resolveNotes} />
-      </div>
-
       <div className="mt-4 min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#0A1220] p-3">
         <p className="text-xs font-black uppercase text-[#64748B]">
           Solo Mission
         </p>
-        <div className="mt-3 grid min-w-0 gap-2 text-sm font-black leading-6">
+        <div className="mt-3 grid min-w-0 gap-2 text-sm font-black leading-6 md:grid-cols-4">
           <p className="break-words text-[#CBD5E1]">
-            타겟{" "}
-            <span style={{ color: TARGET_NOTE_COLOR }}>
-              {soloRecommendation.targetNote}
-            </span>
+            타겟 <span style={{ color: TARGET_NOTE_COLOR }}>{soloRecommendation.targetNote}</span>
           </p>
           <p className="break-words text-[#94A3B8]">
-            스케일: {primaryScaleChoice?.label ?? "Auto 추천"}
+            {primaryScaleChoice?.label ?? "Auto 추천"}
           </p>
           <p className="break-words text-[#94A3B8]">해결: {soloResolution}</p>
-          <p className="break-words text-[#A7F3D0]">
-            착지 후보: {resolveNotes.length > 0 ? resolveNotes.join(", ") : "-"}
-          </p>
           <p className="break-words text-[#94A3B8]">과제: {soloRecommendation.exercise}</p>
         </div>
       </div>
     </section>
-  );
-}
-
-function SoloInfoBlock({ title, notes }: { title: string; notes: string[] }) {
-  return (
-    <div className="min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#07111F] p-3">
-      <p className="break-words text-sm font-bold text-slate-400">{title}</p>
-      <div className="mt-2 flex min-w-0 flex-wrap gap-2">
-        {notes.map((note) => (
-          <span
-            key={`${title}-${note}`}
-            className="max-w-full break-words rounded-md border border-blue-900/30 bg-[#0B1730] px-2 py-1 text-sm font-black text-[#CBD5E1]"
-          >
-            {note}
-          </span>
-        ))}
-      </div>
-    </div>
   );
 }
 

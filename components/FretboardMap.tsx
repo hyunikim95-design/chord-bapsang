@@ -39,6 +39,13 @@ type GetRoleLabel = (role: FretRole, note: string) => string;
 type GetOpenLaneStyle = (role: FretRole) => string;
 type GetOpenDotStyle = (role: FretRole) => RoleStyle;
 type GetOpenAriaLabel = (role: FretRole, note: string) => string;
+type FretboardPositionMode =
+  | "all"
+  | "open"
+  | "low"
+  | "middle"
+  | "upper"
+  | "high";
 
 const displayModeLabels: Record<FretboardDisplayMode, string> = {
   all: "전체",
@@ -46,6 +53,24 @@ const displayModeLabels: Record<FretboardDisplayMode, string> = {
   chord: "코드톤",
   target: "타겟 노트",
   guide: "가이드톤",
+};
+
+const positionModeLabels: Record<FretboardPositionMode, string> = {
+  all: "전체",
+  open: "오픈",
+  low: "3-5",
+  middle: "5-8",
+  upper: "7-10",
+  high: "9-12",
+};
+
+const positionFrets: Record<FretboardPositionMode, number[]> = {
+  all: Array.from({ length: 12 }, (_, index) => index + 1),
+  open: [1, 2, 3, 4],
+  low: [3, 4, 5],
+  middle: [5, 6, 7, 8],
+  upper: [7, 8, 9, 10],
+  high: [9, 10, 11, 12],
 };
 
 const tabDisplayStringIndexes = [5, 4, 3, 2, 1, 0];
@@ -129,6 +154,40 @@ export function FretboardToggleBar({
   );
 }
 
+export function FretboardPositionBar({
+  positionMode,
+  onChange,
+}: {
+  positionMode: FretboardPositionMode;
+  onChange: (positionMode: FretboardPositionMode) => void;
+}) {
+  return (
+    <div className="inline-flex max-w-full flex-wrap gap-1 rounded-lg border border-blue-900/30 bg-[#02040A] p-1">
+      {(Object.keys(positionModeLabels) as FretboardPositionMode[]).map(
+        (item) => {
+          const isActive = positionMode === item;
+
+          return (
+            <button
+              key={item}
+              type="button"
+              aria-pressed={isActive}
+              onClick={() => onChange(item)}
+              className={`rounded-md px-2.5 py-1.5 text-xs font-black transition focus:outline-none focus:ring-2 focus:ring-blue-700/70 ${
+                isActive
+                  ? "bg-[#0B1730] text-[#FBBF24] ring-1 ring-amber-400/30"
+                  : "bg-[#07111F] text-[#94A3B8] hover:bg-[#0B1730] hover:text-[#E5E7EB]"
+              }`}
+            >
+              {positionModeLabels[item]}
+            </button>
+          );
+        }
+      )}
+    </div>
+  );
+}
+
 export function FretboardStringLane({
   stringNote,
   stringIndex,
@@ -207,9 +266,14 @@ export function FretGrid({
   getOpenDotStyle: GetOpenDotStyle;
   getOpenAriaLabel: GetOpenAriaLabel;
 }) {
+  const gridTemplateColumns = `64px repeat(${frets.length}, minmax(44px, 1fr))`;
+
   return (
     <>
-      <div className="grid min-w-0 grid-cols-[64px_repeat(12,_minmax(44px,_1fr))] gap-1.5 text-center text-xs font-black text-[#64748B]">
+      <div
+        className="grid min-w-0 gap-1.5 text-center text-xs font-black text-[#64748B]"
+        style={{ gridTemplateColumns }}
+      >
         <span />
         {frets.map((fret) => (
           <span
@@ -228,7 +292,8 @@ export function FretGrid({
           return (
             <div
               key={`${mode}-${stringNote}-${stringIndex}`}
-              className="grid min-w-0 grid-cols-[64px_repeat(12,_minmax(44px,_1fr))] gap-1.5"
+              className="grid min-w-0 gap-1.5"
+              style={{ gridTemplateColumns }}
             >
               <FretboardStringLane
                 stringNote={stringNote}
@@ -341,11 +406,15 @@ export function FretboardMap({
 }: FretboardMapProps) {
   const [displayMode, setDisplayMode] =
     useState<FretboardDisplayMode>(() => (mode === "solo" ? "target" : "all"));
+  const [positionMode, setPositionMode] = useState<FretboardPositionMode>(() =>
+    mode === "solo" ? "middle" : "all"
+  );
   const rootNote = currentChordNotes[0] ?? getChordRootSymbol(currentChordSymbol);
   const thirdNote = currentChordNotes[1];
   const fifthNote = currentChordNotes[2];
   const seventhNote = currentChordNotes[3];
-  const frets = Array.from({ length: 12 }, (_, index) => index + 1);
+  const frets = positionFrets[positionMode];
+  const mapMinWidth = Math.max(360, 64 + frets.length * 54);
   const guideToneNotes = [thirdNote, seventhNote].filter(Boolean);
   const displayedRootNote = formatNoteForKey(rootNote, keyRoot);
   const displayedTargetNotes = targetNotes.map((note) =>
@@ -541,6 +610,10 @@ export function FretboardMap({
             displayMode={displayMode}
             onChange={setDisplayMode}
           />
+          <FretboardPositionBar
+            positionMode={positionMode}
+            onChange={setPositionMode}
+          />
           <div className="flex min-w-0 flex-wrap gap-2 text-xs font-bold">
             <span
               className="rounded-md px-2 py-1"
@@ -568,7 +641,10 @@ export function FretboardMap({
       </div>
 
       <div className="mt-4 w-full min-w-0 overflow-x-auto pb-2 xl:overflow-x-visible">
-        <div className="min-w-[720px] max-w-none xl:min-w-0 xl:w-full">
+        <div
+          className="max-w-none xl:min-w-0 xl:w-full"
+          style={{ minWidth: mapMinWidth }}
+        >
           <FretGrid
             frets={frets}
             keyRoot={keyRoot}
@@ -581,15 +657,17 @@ export function FretboardMap({
             getOpenAriaLabel={getOpenAriaLabel}
           />
 
-          <FretboardLegend
-            rootNote={displayedRootNote}
-            targetNotes={displayedTargetNotes}
-            resolveNotes={displayedResolveNotes}
-            guideToneNotes={displayedGuideToneNotes}
-            currentChordNotes={displayedChordNotes}
-            scaleNotes={displayedScaleNotes}
-            displayMode={displayMode}
-          />
+          {mode !== "solo" && (
+            <FretboardLegend
+              rootNote={displayedRootNote}
+              targetNotes={displayedTargetNotes}
+              resolveNotes={displayedResolveNotes}
+              guideToneNotes={displayedGuideToneNotes}
+              currentChordNotes={displayedChordNotes}
+              scaleNotes={displayedScaleNotes}
+              displayMode={displayMode}
+            />
+          )}
         </div>
       </div>
     </section>
