@@ -39,6 +39,7 @@ type GetRoleLabel = (role: FretRole, note: string) => string;
 type GetOpenLaneStyle = (role: FretRole) => string;
 type GetOpenDotStyle = (role: FretRole) => RoleStyle;
 type GetOpenAriaLabel = (role: FretRole, note: string) => string;
+type FretboardLabelMode = "note" | "role";
 type FretboardPositionMode =
   | "all"
   | "open"
@@ -71,6 +72,11 @@ const positionFrets: Record<FretboardPositionMode, number[]> = {
   middle: [5, 6, 7, 8],
   upper: [7, 8, 9, 10],
   high: [9, 10, 11, 12],
+};
+
+const labelModeLabels: Record<FretboardLabelMode, string> = {
+  note: "음이름",
+  role: "역할",
 };
 
 const tabDisplayStringIndexes = [5, 4, 3, 2, 1, 0];
@@ -188,11 +194,44 @@ export function FretboardPositionBar({
   );
 }
 
+export function FretboardLabelModeBar({
+  labelMode,
+  onChange,
+}: {
+  labelMode: FretboardLabelMode;
+  onChange: (labelMode: FretboardLabelMode) => void;
+}) {
+  return (
+    <div className="inline-flex max-w-full flex-wrap gap-1 rounded-lg border border-blue-900/30 bg-[#02040A] p-1">
+      {(Object.keys(labelModeLabels) as FretboardLabelMode[]).map((item) => {
+        const isActive = labelMode === item;
+
+        return (
+          <button
+            key={item}
+            type="button"
+            aria-pressed={isActive}
+            onClick={() => onChange(item)}
+            className={`rounded-md px-2.5 py-1.5 text-xs font-black transition focus:outline-none focus:ring-2 focus:ring-blue-700/70 ${
+              isActive
+                ? "bg-[#1E40AF] text-white shadow-sm shadow-black/30"
+                : "bg-[#07111F] text-[#94A3B8] hover:bg-[#0B1730] hover:text-[#E5E7EB]"
+            }`}
+          >
+            {labelModeLabels[item]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function FretboardStringLane({
   stringNote,
   stringIndex,
   keyRoot,
   getFretRole,
+  getRoleLabel,
   getOpenLaneStyle,
   getOpenDotStyle,
   getOpenAriaLabel,
@@ -201,6 +240,7 @@ export function FretboardStringLane({
   stringIndex: number;
   keyRoot: string;
   getFretRole: GetFretRole;
+  getRoleLabel: GetRoleLabel;
   getOpenLaneStyle: GetOpenLaneStyle;
   getOpenDotStyle: GetOpenDotStyle;
   getOpenAriaLabel: GetOpenAriaLabel;
@@ -232,7 +272,7 @@ export function FretboardStringLane({
           }`}
           style={getOpenDotStyle(openRole)}
         >
-          {openNote}
+          {getRoleLabel(openRole, openNote)}
         </span>
       ) : (
         <span
@@ -300,6 +340,7 @@ export function FretGrid({
                 stringIndex={stringIndex}
                 keyRoot={keyRoot}
                 getFretRole={getFretRole}
+                getRoleLabel={getRoleLabel}
                 getOpenLaneStyle={getOpenLaneStyle}
                 getOpenDotStyle={getOpenDotStyle}
                 getOpenAriaLabel={getOpenAriaLabel}
@@ -406,6 +447,9 @@ export function FretboardMap({
 }: FretboardMapProps) {
   const [displayMode, setDisplayMode] =
     useState<FretboardDisplayMode>(() => (mode === "solo" ? "target" : "all"));
+  const [labelMode, setLabelMode] = useState<FretboardLabelMode>(() =>
+    mode === "solo" ? "role" : "note"
+  );
   const [positionMode, setPositionMode] = useState<FretboardPositionMode>(() =>
     mode === "solo" ? "middle" : "all"
   );
@@ -522,7 +566,19 @@ export function FretboardMap({
   }
 
   function getRoleLabel(role: FretRole, note: string) {
-    return role === "inactive" ? "" : formatNoteForKey(note, keyRoot);
+    if (role === "inactive") return "";
+
+    if (labelMode === "role") {
+      if (role === "root") return "R";
+      if (role === "target") return "T";
+      if (role === "resolve") return "→";
+      if (role === "third") return "3";
+      if (role === "seventh") return "7";
+      if (role === "chord") return sameNotePitch(note, fifthNote) ? "5" : "C";
+      if (role === "scale") return "S";
+    }
+
+    return formatNoteForKey(note, keyRoot);
   }
 
   function getOpenLaneStyle(role: FretRole) {
@@ -609,6 +665,10 @@ export function FretboardMap({
           <FretboardToggleBar
             displayMode={displayMode}
             onChange={setDisplayMode}
+          />
+          <FretboardLabelModeBar
+            labelMode={labelMode}
+            onChange={setLabelMode}
           />
           <FretboardPositionBar
             positionMode={positionMode}

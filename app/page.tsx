@@ -3812,42 +3812,12 @@ function PracticePanel({
             currentIndex={currentIndex}
           />
         ) : showBestMovePanel && bestVoicingPair ? (
-          <section className="min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#0A1220] p-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-xs font-black uppercase text-[#64748B]">
-                  Best Move
-                </p>
-                <h3 className="mt-1 text-xl font-black text-white">
-                  최소 이동 추천 연결
-                </h3>
-              </div>
-
-              <span className="rounded-lg bg-[#1E40AF] px-3 py-2 text-sm font-black text-white">
-                {getMovementLabel(bestVoicingPair.distance)}
-              </span>
-            </div>
-
-            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center">
-              <PracticeVoicingCard
-                label="현재"
-                symbol={currentPracticeItem.symbol}
-                voicing={bestVoicingPair.currentVoicing}
-              />
-              <div className="text-center text-2xl font-black text-[#64748B]">→</div>
-              <PracticeVoicingCard
-                label="다음"
-                symbol={nextPracticeItem?.symbol ?? "-"}
-                voicing={bestVoicingPair.nextVoicing}
-              />
-            </div>
-
-            {viewMode !== "minimal" && (
-              <p className="mt-3 text-sm font-bold text-[#94A3B8]">
-                이동량 점수: {bestVoicingPair.distance} / 낮을수록 손 이동이 적음
-              </p>
-            )}
-          </section>
+          <ChordPracticeDetailPanel
+            currentSymbol={currentPracticeItem.symbol}
+            nextSymbol={nextPracticeItem?.symbol ?? "-"}
+            bestVoicingPair={bestVoicingPair}
+            viewMode={viewMode}
+          />
         ) : showMinimalStepFocus ? (
           <MinimalStepFocusCard
             practiceStep={practiceStep}
@@ -3954,6 +3924,13 @@ function MinimalPracticeStrip({
             </p>
           </div>
 
+          <BeatPulseCard
+            beatInChord={beatInChord}
+            safeBeatsPerChord={safeBeatsPerChord}
+            isAutoPlaying={isAutoPlaying}
+            countInRemaining={countInRemaining}
+          />
+
           <div className="grid grid-cols-3 gap-1.5">
             <button
               type="button"
@@ -3983,6 +3960,57 @@ function MinimalPracticeStrip({
           </p>
         </div>
       </div>
+    </section>
+  );
+}
+
+function ChordPracticeDetailPanel({
+  currentSymbol,
+  nextSymbol,
+  bestVoicingPair,
+  viewMode,
+}: {
+  currentSymbol: string;
+  nextSymbol: string;
+  bestVoicingPair: VoicingPair;
+  viewMode: ViewMode;
+}) {
+  return (
+    <section className="min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#0A1220] p-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase text-[#64748B]">
+            Best Move
+          </p>
+          <h3 className="mt-1 text-xl font-black text-white">
+            최소 이동 추천 연결
+          </h3>
+        </div>
+
+        <span className="rounded-lg bg-[#1E40AF] px-3 py-2 text-sm font-black text-white">
+          {getMovementLabel(bestVoicingPair.distance)}
+        </span>
+      </div>
+
+      <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center">
+        <PracticeVoicingCard
+          label="현재"
+          symbol={currentSymbol}
+          voicing={bestVoicingPair.currentVoicing}
+        />
+        <div className="text-center text-2xl font-black text-[#64748B]">→</div>
+        <PracticeVoicingCard
+          label="다음"
+          symbol={nextSymbol}
+          voicing={bestVoicingPair.nextVoicing}
+        />
+      </div>
+
+      {viewMode !== "minimal" && (
+        <p className="mt-3 text-sm font-bold text-[#94A3B8]">
+          이동량 점수: {bestVoicingPair.distance} / 낮을수록 손 이동이 적음
+        </p>
+      )}
     </section>
   );
 }
@@ -4020,6 +4048,52 @@ function PracticeStepToggle({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function BeatPulseCard({
+  beatInChord,
+  safeBeatsPerChord,
+  isAutoPlaying,
+  countInRemaining,
+}: {
+  beatInChord: number;
+  safeBeatsPerChord: number;
+  isAutoPlaying: boolean;
+  countInRemaining: number | null;
+}) {
+  const isCountingIn = countInRemaining !== null;
+  const displayValue = isCountingIn ? countInRemaining : beatInChord;
+  const label = isCountingIn ? "Count In" : "Beat";
+
+  return (
+    <div className="min-w-0 rounded-lg border border-blue-900/25 bg-[#050B16] p-3">
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <p className="text-xs font-black uppercase text-[#64748B]">{label}</p>
+        <span
+          className={`rounded-md px-2 py-1 text-xs font-black ${
+            isCountingIn
+              ? "bg-amber-500/15 text-[#FBBF24]"
+              : isAutoPlaying
+                ? "bg-[#1E40AF] text-white"
+                : "border border-blue-900/30 text-[#94A3B8]"
+          }`}
+        >
+          {isCountingIn ? "Ready" : isAutoPlaying ? "Playing" : "Stopped"}
+        </span>
+      </div>
+      <div className="mt-2 flex items-end justify-between gap-3">
+        <p
+          className="text-5xl font-black leading-none md:text-6xl"
+          style={{ color: isCountingIn ? ROOT_NOTE_COLOR : "#E5E7EB" }}
+        >
+          {displayValue}
+        </p>
+        <p className="pb-1 text-sm font-black text-[#64748B]">
+          / {safeBeatsPerChord}
+        </p>
+      </div>
     </div>
   );
 }
