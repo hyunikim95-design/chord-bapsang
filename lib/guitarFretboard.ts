@@ -17,7 +17,14 @@ export const CHORD_TONE_COLOR = "#334155";
 export const SCALE_TONE_COLOR = "#1E293B";
 export const DISABLED_NOTE_COLOR = "#0F172A";
 
+export type InstrumentMode = "guitar" | "bass";
+
 export const standardTuningNotes = ["E", "A", "D", "G", "B", "E"];
+export const bassTuningNotes = ["E", "A", "D", "G"];
+
+export function getTuningNotes(instrumentMode: InstrumentMode = "guitar") {
+  return instrumentMode === "bass" ? bassTuningNotes : standardTuningNotes;
+}
 
 export type FretRole =
   | "root"
@@ -48,9 +55,10 @@ export function sameNotePitch(noteA?: string, noteB?: string) {
 export function getStringNoteAtFret(
   stringIndex: number,
   fret: number,
-  keyRoot = "C"
+  keyRoot = "C",
+  instrumentMode: InstrumentMode = "guitar"
 ) {
-  const openNote = standardTuningNotes[stringIndex] ?? "E";
+  const openNote = getTuningNotes(instrumentMode)[stringIndex] ?? "E";
   return getNoteNameAtFret(openNote, fret, getNoteNamePreference(keyRoot));
 }
 
@@ -58,6 +66,9 @@ export function formatNoteForKey(note: string, keyRoot: string) {
   return getPreferredNoteName(getPitchClass(note), getNoteNamePreference(keyRoot));
 }
 
-export function getGuitarStringNumber(stringIndex: number) {
-  return 6 - stringIndex;
+export function getGuitarStringNumber(
+  stringIndex: number,
+  instrumentMode: InstrumentMode = "guitar"
+) {
+  return getTuningNotes(instrumentMode).length - stringIndex;
 }

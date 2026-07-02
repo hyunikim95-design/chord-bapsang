@@ -19,6 +19,7 @@ import {
   getSelectableScaleChoicesForChord,
   type RecommendedScaleChoice,
 } from "../data/scaleTheory";
+import type { InstrumentMode } from "../lib/guitarFretboard";
 import {
   areSamePitch as areSamePitchClass,
   getNoteNameAtFret,
@@ -289,6 +290,11 @@ type RecentPracticeSession = {
   voicingMode: VoicingMode;
   trainingMode: TrainingMode;
   updatedAt: number;
+};
+
+const instrumentModeLabels: Record<InstrumentMode, string> = {
+  guitar: "Guitar",
+  bass: "Bass",
 };
 
 const favoriteProgressionsStorageKey =
@@ -749,6 +755,54 @@ function getUniquePitchNotes(notes: (string | undefined)[]) {
   });
 }
 
+function transposeNoteName(note: string | undefined, semitones: number) {
+  if (!note) return "";
+
+  const noteIndex = getNoteIndex(note);
+  if (noteIndex < 0) return "";
+
+  const outputNotes = getOutputNoteNames(note);
+  return outputNotes[(noteIndex + semitones + 12) % 12];
+}
+
+type BassPracticeInfo = {
+  root: string;
+  third: string;
+  fifth: string;
+  octave: string;
+  nextRoot: string;
+  approach: string;
+  targetNotes: string[];
+  resolveNotes: string[];
+};
+
+function getBassPracticeInfo(
+  currentItem: PracticeItem,
+  nextItem: PracticeItem | undefined
+): BassPracticeInfo {
+  const root = currentItem.notes[0] ?? getChordRootSymbol(currentItem.symbol);
+  const third = currentItem.notes[1] ?? root;
+  const fifth = currentItem.notes[2] ?? root;
+  const nextRoot = nextItem?.notes[0] ?? getChordRootSymbol(nextItem?.symbol ?? "");
+  const lowerApproach = transposeNoteName(nextRoot, -1);
+  const upperApproach = transposeNoteName(nextRoot, 1);
+  const approach =
+    nextRoot && lowerApproach && upperApproach
+      ? `${lowerApproach} -> ${nextRoot} / ${upperApproach} -> ${nextRoot}`
+      : "다음 루트를 먼저 확인";
+
+  return {
+    root,
+    third,
+    fifth,
+    octave: root,
+    nextRoot,
+    approach,
+    targetNotes: getUniquePitchNotes([root, fifth, third]),
+    resolveNotes: getUniquePitchNotes([nextRoot]),
+  };
+}
+
 function getResolutionCandidates(nextItem: PracticeItem | undefined) {
   if (!nextItem || nextItem.notes.length === 0) return [];
 
@@ -1058,6 +1112,8 @@ export default function Home() {
 
   const [practiceMode, setPracticeMode] = useState(true);
   const [trainingMode, setTrainingMode] = useState<TrainingMode>("chords");
+  const [instrumentMode, setInstrumentMode] =
+    useState<InstrumentMode>("guitar");
   const [viewMode, setViewMode] = useState<ViewMode>("minimal");
   const [practiceStep, setPracticeStep] = useState<PracticeStep>("chord");
   const [selectedSoloScaleName, setSelectedSoloScaleName] = useState("auto");
@@ -1969,11 +2025,17 @@ useEffect(() => {
             </button>
           </div>
 
+          <InstrumentModeToggle
+            instrumentMode={instrumentMode}
+            onChange={setInstrumentMode}
+          />
+
           {practiceMode && currentPracticeItem && (
             <PracticePanel
               currentPracticeItem={currentPracticeItem}
               nextPracticeItem={nextPracticeItem}
               trainingMode={trainingMode}
+              instrumentMode={instrumentMode}
               viewMode={viewMode}
               practiceStep={practiceStep}
               currentIndex={safeCurrentIndex}
@@ -3044,6 +3106,48 @@ function ViewModeTabs({
   );
 }
 
+function InstrumentModeToggle({
+  instrumentMode,
+  onChange,
+}: {
+  instrumentMode: InstrumentMode;
+  onChange: (mode: InstrumentMode) => void;
+}) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <p className="text-xs font-black uppercase text-[#64748B]">
+        Instrument
+      </p>
+      <div className="inline-grid rounded-lg border border-blue-900/30 bg-black/25 p-1 sm:grid-cols-2">
+        {(Object.keys(instrumentModeLabels) as InstrumentMode[]).map((mode) => {
+          const isActive = instrumentMode === mode;
+
+          return (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={isActive}
+              onClick={() => onChange(mode)}
+              className={`rounded-md px-5 py-2.5 text-sm font-black transition focus:outline-none focus:ring-2 focus:ring-blue-700/70 ${
+                isActive
+                  ? "bg-[#1E40AF] text-white shadow-sm shadow-black/30"
+                  : "bg-[#07111F] text-[#94A3B8] hover:bg-[#0B1730] hover:text-[#CBD5E1]"
+              }`}
+            >
+              {instrumentModeLabels[mode]}
+            </button>
+          );
+        })}
+      </div>
+      <span className="rounded-lg border border-blue-900/30 bg-[#050B16] px-3 py-2 text-xs font-bold text-[#94A3B8]">
+        {instrumentMode === "bass"
+          ? "4줄 루트/5도 중심"
+          : "6줄 코드/솔로 중심"}
+      </span>
+    </div>
+  );
+}
+
 function TheoryAccordion({
   progressionAnalysis,
   currentSoloScale,
@@ -3437,6 +3541,7 @@ function PracticePanel({
   currentPracticeItem,
   nextPracticeItem,
   trainingMode,
+  instrumentMode,
   viewMode,
   practiceStep,
   currentIndex,
@@ -3472,6 +3577,7 @@ function PracticePanel({
   currentPracticeItem: PracticeItem;
   nextPracticeItem: PracticeItem | undefined;
   trainingMode: TrainingMode;
+  instrumentMode: InstrumentMode;
   viewMode: ViewMode;
   practiceStep: PracticeStep;
   currentIndex: number;
@@ -3519,6 +3625,10 @@ function PracticePanel({
     rhythmPrompt,
     constraintPrompt
   );
+  const bassPracticeInfo = getBassPracticeInfo(
+    currentPracticeItem,
+    nextPracticeItem
+  );
   const currentRootHint = bestVoicingPair
     ? getRootHint(currentPracticeItem.symbol, bestVoicingPair.currentVoicing)
     : currentPracticeItem.notes[0] || getChordRootSymbol(currentPracticeItem.symbol);
@@ -3527,7 +3637,9 @@ function PracticePanel({
       ? getRootHint(nextPracticeItem.symbol, bestVoicingPair.nextVoicing)
       : nextPracticeItem?.notes[0] || getChordRootSymbol(nextPracticeItem?.symbol ?? "");
   const stepHint =
-    practiceStep === "root"
+    instrumentMode === "bass"
+      ? `루트 ${bassPracticeInfo.root} / 다음 ${bassPracticeInfo.nextRoot || "-"}`
+      : practiceStep === "root"
       ? `루트: ${currentRootHint} / 다음 ${nextRootHint || "-"}`
       : practiceStep === "rhythm"
         ? `${safeBpm} BPM, ${safeBeatsPerChord}박마다 코드 변경`
@@ -3535,8 +3647,11 @@ function PracticePanel({
           ? `타겟 ${soloRecommendation.targetNote} → ${soloRecommendation.resolution}`
           : focusMovementHint;
   const showFullSoloPanel =
-    trainingMode === "solo" && (viewMode !== "minimal" || practiceStep === "solo");
+    instrumentMode === "guitar" &&
+    trainingMode === "solo" &&
+    (viewMode !== "minimal" || practiceStep === "solo");
   const showBestMovePanel =
+    instrumentMode === "guitar" &&
     trainingMode === "chords" &&
     bestVoicingPair &&
     (viewMode !== "minimal" || practiceStep === "chord");
@@ -3552,6 +3667,7 @@ function PracticePanel({
           currentPracticeItem={currentPracticeItem}
           nextPracticeItem={nextPracticeItem}
           trainingMode={trainingMode}
+          instrumentMode={instrumentMode}
           practiceStep={practiceStep}
           stepHint={stepHint}
           safeBpm={safeBpm}
@@ -3584,7 +3700,15 @@ function PracticePanel({
           resolveNotes={soloRecommendation.resolution}
         />
 
-        {trainingMode === "chords" && practiceStep === "chord" && bestVoicingPair ? (
+        {instrumentMode === "bass" ? (
+          <BassPracticePanel
+            currentPracticeItem={currentPracticeItem}
+            nextPracticeItem={nextPracticeItem}
+            selectedKeyRoot={selectedKeyRoot}
+            bassPracticeInfo={bassPracticeInfo}
+            compact
+          />
+        ) : trainingMode === "chords" && practiceStep === "chord" && bestVoicingPair ? (
           <section className="mt-5 min-w-0">
             <div className="mx-auto grid max-w-[760px] gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center">
               <PracticeVoicingCard
@@ -3623,6 +3747,7 @@ function PracticePanel({
         currentPracticeItem={currentPracticeItem}
         nextPracticeItem={nextPracticeItem}
         trainingMode={trainingMode}
+        instrumentMode={instrumentMode}
         practiceStep={practiceStep}
         stepHint={stepHint}
         safeBpm={safeBpm}
@@ -3661,7 +3786,11 @@ function PracticePanel({
           >
             <div className="min-w-0">
               <p className="text-xs font-black uppercase text-[#64748B]">
-                {trainingMode === "solo" ? "Solo Practice" : "Now Playing"}
+                {instrumentMode === "bass"
+                  ? "Bass Practice"
+                  : trainingMode === "solo"
+                    ? "Solo Practice"
+                    : "Now Playing"}
               </p>
               <h2
                 className={`mt-1 break-words font-black tracking-tight text-white ${
@@ -3678,6 +3807,7 @@ function PracticePanel({
                 }`}
               >
                 {selectedKey} / {safeBpm} BPM
+                {instrumentMode === "bass" ? " / 4-string" : ""}
               </p>
             </div>
 
@@ -3723,7 +3853,23 @@ function PracticePanel({
               trainingMode === "solo" ? "sm:grid-cols-2 xl:grid-cols-1" : "sm:grid-cols-2 lg:grid-cols-1"
             }`}
           >
-            {trainingMode === "solo" ? (
+            {instrumentMode === "bass" ? (
+              <>
+                <PracticeMiniCard title="루트" value={bassPracticeInfo.root || "-"} />
+                <PracticeMiniCard
+                  title="5도 / 3도"
+                  value={`${bassPracticeInfo.fifth || "-"} / ${bassPracticeInfo.third || "-"}`}
+                />
+                <PracticeMiniCard
+                  title="다음 루트"
+                  value={bassPracticeInfo.nextRoot || "-"}
+                />
+                <PracticeMiniCard
+                  title="접근음"
+                  value={bassPracticeInfo.approach}
+                />
+              </>
+            ) : trainingMode === "solo" ? (
               <>
                 <PracticeMiniCard title="타겟" value={soloRecommendation.targetNote} />
                 <PracticeMiniCard
@@ -3746,13 +3892,17 @@ function PracticePanel({
                 <PracticeMiniCard title="이동 힌트" value={focusMovementHint} />
               </>
             )}
-            {trainingMode !== "solo" && practiceStep === "root" && (
+            {instrumentMode === "guitar" &&
+              trainingMode !== "solo" &&
+              practiceStep === "root" && (
               <>
                 <PracticeMiniCard title="현재 루트" value={currentRootHint} />
                 <PracticeMiniCard title="다음 루트" value={nextRootHint || "-"} />
               </>
             )}
-            {trainingMode !== "solo" && practiceStep === "rhythm" && (
+            {instrumentMode === "guitar" &&
+              trainingMode !== "solo" &&
+              practiceStep === "rhythm" && (
               <>
                 <PracticeMiniCard title="BPM / 박자" value={`${safeBpm} / ${safeBeatsPerChord}`} />
                 <PracticeMiniCard
@@ -3773,14 +3923,18 @@ function PracticePanel({
                 />
               </>
             )}
-            {trainingMode !== "solo" && practiceStep === "solo" && (
+            {instrumentMode === "guitar" &&
+              trainingMode !== "solo" &&
+              practiceStep === "solo" && (
               <>
                 <PracticeMiniCard title="타겟 노트" value={soloRecommendation.targetNote} />
                 <PracticeMiniCard title="착지 후보" value={soloRecommendation.resolution} />
                 <PracticeMiniCard title="연습 과제" value={soloRecommendation.exercise} />
               </>
             )}
-            {voicingFallbackMessage && trainingMode === "chords" && (
+            {voicingFallbackMessage &&
+              instrumentMode === "guitar" &&
+              trainingMode === "chords" && (
               <div className="rounded-lg border border-amber-400/20 bg-amber-500/10 p-3 text-xs font-bold text-[#F59E0B]">
                 {voicingFallbackMessage}
               </div>
@@ -3792,14 +3946,25 @@ function PracticePanel({
 
           {viewMode !== "minimal" && (
             <p className="mt-4 text-sm leading-6 text-[#94A3B8]">
-              {trainingMode === "solo"
+              {instrumentMode === "bass"
+                ? `베이스는 루트 ${bassPracticeInfo.root}에서 다음 루트 ${
+                    bassPracticeInfo.nextRoot || "-"
+                  }로 이동합니다.`
+                : trainingMode === "solo"
                 ? `${selectedKeyRoot} major 위에서 현재 코드톤에 착지.`
                 : `현재 ${currentVoicings.length}개, 다음 ${nextVoicings.length}개 보이싱 후보.`}
             </p>
           )}
         </div>
 
-        {showFullSoloPanel ? (
+        {instrumentMode === "bass" ? (
+          <BassPracticePanel
+            currentPracticeItem={currentPracticeItem}
+            nextPracticeItem={nextPracticeItem}
+            selectedKeyRoot={selectedKeyRoot}
+            bassPracticeInfo={bassPracticeInfo}
+          />
+        ) : showFullSoloPanel ? (
           <SoloPracticePanel
             currentPracticeItem={currentPracticeItem}
             nextPracticeItem={nextPracticeItem}
@@ -3810,6 +3975,7 @@ function PracticePanel({
             selectableSoloScaleChoices={selectableSoloScaleChoices}
             onSelectedSoloScaleNameChange={onSelectedSoloScaleNameChange}
             currentIndex={currentIndex}
+            instrumentMode={instrumentMode}
           />
         ) : showBestMovePanel && bestVoicingPair ? (
           <ChordPracticeDetailPanel
@@ -3852,6 +4018,7 @@ function MinimalPracticeStrip({
   currentPracticeItem,
   nextPracticeItem,
   trainingMode,
+  instrumentMode,
   practiceStep,
   stepHint,
   safeBpm,
@@ -3866,6 +4033,7 @@ function MinimalPracticeStrip({
   currentPracticeItem: PracticeItem;
   nextPracticeItem: PracticeItem | undefined;
   trainingMode: TrainingMode;
+  instrumentMode: InstrumentMode;
   practiceStep: PracticeStep;
   stepHint: string;
   safeBpm: number;
@@ -3913,7 +4081,12 @@ function MinimalPracticeStrip({
           <div className="rounded-lg border border-blue-900/25 bg-[#07111F] p-3">
             <div className="flex min-w-0 items-center justify-between gap-3">
               <p className="text-xs font-black uppercase text-[#64748B]">
-                {practiceStepLabels[practiceStep]} / {trainingMode === "solo" ? "Solo" : "Chord"}
+                {practiceStepLabels[practiceStep]} /{" "}
+                {instrumentMode === "bass"
+                  ? "Bass"
+                  : trainingMode === "solo"
+                    ? "Solo"
+                    : "Chord"}
               </p>
               <p className="shrink-0 text-xs font-black text-[#94A3B8]">
                 {safeBpm} BPM · {beatInChord}/{safeBeatsPerChord}
@@ -4011,6 +4184,75 @@ function ChordPracticeDetailPanel({
           이동량 점수: {bestVoicingPair.distance} / 낮을수록 손 이동이 적음
         </p>
       )}
+    </section>
+  );
+}
+
+function BassPracticePanel({
+  currentPracticeItem,
+  nextPracticeItem,
+  selectedKeyRoot,
+  bassPracticeInfo,
+  compact = false,
+}: {
+  currentPracticeItem: PracticeItem;
+  nextPracticeItem: PracticeItem | undefined;
+  selectedKeyRoot: string;
+  bassPracticeInfo: BassPracticeInfo;
+  compact?: boolean;
+}) {
+  const chordNotes =
+    currentPracticeItem.notes.length > 0
+      ? currentPracticeItem.notes
+      : getUniquePitchNotes([
+          bassPracticeInfo.root,
+          bassPracticeInfo.third,
+          bassPracticeInfo.fifth,
+        ]);
+
+  return (
+    <section
+      className={`min-w-0 overflow-hidden rounded-lg border border-blue-900/30 bg-[#0A1220] ${
+        compact ? "mt-5 p-3" : "p-4"
+      }`}
+    >
+      <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-black uppercase text-[#64748B]">
+            Bass Practice
+          </p>
+          <h3 className="mt-1 break-words text-xl font-black text-white">
+            {currentPracticeItem.symbol} -&gt; {nextPracticeItem?.symbol ?? "-"}
+          </h3>
+        </div>
+        <span className="rounded-lg border border-amber-400/30 bg-amber-500/15 px-3 py-2 text-sm font-black text-[#FBBF24]">
+          Root {bassPracticeInfo.root || "-"}
+        </span>
+      </div>
+
+      <div className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <PracticeMiniCard title="루트" value={bassPracticeInfo.root || "-"} />
+        <PracticeMiniCard
+          title="5도 / 3도"
+          value={`${bassPracticeInfo.fifth || "-"} / ${bassPracticeInfo.third || "-"}`}
+        />
+        <PracticeMiniCard
+          title="다음 루트"
+          value={bassPracticeInfo.nextRoot || "-"}
+        />
+        <PracticeMiniCard title="접근음" value={bassPracticeInfo.approach} />
+      </div>
+
+      <SoloFretboardMap
+        keyRoot={selectedKeyRoot}
+        currentChordSymbol={currentPracticeItem.symbol}
+        currentChordNotes={chordNotes}
+        scaleNotes={[]}
+        targetNotes={bassPracticeInfo.targetNotes}
+        resolveNotes={bassPracticeInfo.resolveNotes}
+        mode="solo"
+        instrumentMode="bass"
+      />
     </section>
   );
 }
@@ -4281,6 +4523,7 @@ function SoloPracticePanel({
   selectableSoloScaleChoices,
   onSelectedSoloScaleNameChange,
   currentIndex,
+  instrumentMode,
   compact = false,
 }: {
   currentPracticeItem: PracticeItem;
@@ -4292,6 +4535,7 @@ function SoloPracticePanel({
   selectableSoloScaleChoices: RecommendedScaleChoice[];
   onSelectedSoloScaleNameChange: (scaleName: string) => void;
   currentIndex: number;
+  instrumentMode: InstrumentMode;
   compact?: boolean;
 }) {
   const chordTones =
@@ -4357,6 +4601,7 @@ function SoloPracticePanel({
           targetNotes={targetNotes}
           resolveNotes={resolveNotes}
           mode="solo"
+          instrumentMode={instrumentMode}
         />
       )}
 

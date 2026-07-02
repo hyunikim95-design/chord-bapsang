@@ -18,8 +18,9 @@ import {
   getChordRootSymbol,
   getGuitarStringNumber,
   getStringNoteAtFret,
+  getTuningNotes,
   sameNotePitch,
-  standardTuningNotes,
+  type InstrumentMode,
 } from "../lib/guitarFretboard";
 
 type FretboardMapProps = {
@@ -30,6 +31,7 @@ type FretboardMapProps = {
   targetNotes?: string[];
   resolveNotes?: string[];
   mode: "chord" | "solo";
+  instrumentMode?: InstrumentMode;
 };
 
 type RoleStyle = React.CSSProperties;
@@ -79,7 +81,11 @@ const labelModeLabels: Record<FretboardLabelMode, string> = {
   role: "역할",
 };
 
-const tabDisplayStringIndexes = [5, 4, 3, 2, 1, 0];
+function getDisplayStringIndexes(instrumentMode: InstrumentMode) {
+  return getTuningNotes(instrumentMode)
+    .map((_, index) => index)
+    .reverse();
+}
 
 function getVisibleRole({
   role,
@@ -235,6 +241,7 @@ export function FretboardStringLane({
   getOpenLaneStyle,
   getOpenDotStyle,
   getOpenAriaLabel,
+  instrumentMode,
 }: {
   stringNote: string;
   stringIndex: number;
@@ -244,8 +251,9 @@ export function FretboardStringLane({
   getOpenLaneStyle: GetOpenLaneStyle;
   getOpenDotStyle: GetOpenDotStyle;
   getOpenAriaLabel: GetOpenAriaLabel;
+  instrumentMode: InstrumentMode;
 }) {
-  const openNote = getStringNoteAtFret(stringIndex, 0, keyRoot);
+  const openNote = getStringNoteAtFret(stringIndex, 0, keyRoot, instrumentMode);
   const openRole = getFretRole(openNote);
   const ariaLabel = getOpenAriaLabel(openRole, openNote);
   const isOpenNoteFeatured = openRole !== "inactive";
@@ -258,7 +266,7 @@ export function FretboardStringLane({
       title={ariaLabel}
     >
       <span className="whitespace-nowrap">
-        {getGuitarStringNumber(stringIndex)} {stringNote}
+        {getGuitarStringNumber(stringIndex, instrumentMode)} {stringNote}
       </span>
       {isOpenNoteFeatured ? (
         <span
@@ -295,6 +303,7 @@ export function FretGrid({
   getOpenLaneStyle,
   getOpenDotStyle,
   getOpenAriaLabel,
+  instrumentMode,
 }: {
   frets: number[];
   keyRoot: string;
@@ -305,8 +314,11 @@ export function FretGrid({
   getOpenLaneStyle: GetOpenLaneStyle;
   getOpenDotStyle: GetOpenDotStyle;
   getOpenAriaLabel: GetOpenAriaLabel;
+  instrumentMode: InstrumentMode;
 }) {
   const gridTemplateColumns = `64px repeat(${frets.length}, minmax(44px, 1fr))`;
+  const tuningNotes = getTuningNotes(instrumentMode);
+  const displayStringIndexes = getDisplayStringIndexes(instrumentMode);
 
   return (
     <>
@@ -326,8 +338,8 @@ export function FretGrid({
       </div>
 
       <div className="mt-1.5 min-w-0 space-y-1.5">
-        {tabDisplayStringIndexes.map((stringIndex) => {
-          const stringNote = standardTuningNotes[stringIndex] ?? "E";
+        {displayStringIndexes.map((stringIndex) => {
+          const stringNote = tuningNotes[stringIndex] ?? "E";
 
           return (
             <div
@@ -344,9 +356,15 @@ export function FretGrid({
                 getOpenLaneStyle={getOpenLaneStyle}
                 getOpenDotStyle={getOpenDotStyle}
                 getOpenAriaLabel={getOpenAriaLabel}
+                instrumentMode={instrumentMode}
               />
               {frets.map((fret) => {
-                const note = getStringNoteAtFret(stringIndex, fret, keyRoot);
+                const note = getStringNoteAtFret(
+                  stringIndex,
+                  fret,
+                  keyRoot,
+                  instrumentMode
+                );
                 const role = getFretRole(note);
                 const style = getRoleStyle(role);
 
@@ -356,7 +374,8 @@ export function FretGrid({
                     className="flex h-8 items-center justify-center rounded-md border text-xs font-black"
                     style={style}
                     title={`${getGuitarStringNumber(
-                      stringIndex
+                      stringIndex,
+                      instrumentMode
                     )} string ${fret} fret: ${note}`}
                   >
                     <span className="leading-none">
@@ -444,6 +463,7 @@ export function FretboardMap({
   targetNotes = [],
   resolveNotes = [],
   mode,
+  instrumentMode = "guitar",
 }: FretboardMapProps) {
   const [displayMode, setDisplayMode] =
     useState<FretboardDisplayMode>(() => (mode === "solo" ? "target" : "all"));
@@ -458,7 +478,10 @@ export function FretboardMap({
   const fifthNote = currentChordNotes[2];
   const seventhNote = currentChordNotes[3];
   const frets = positionFrets[positionMode];
-  const mapMinWidth = Math.max(360, 64 + frets.length * 54);
+  const mapMinWidth = Math.max(
+    instrumentMode === "bass" ? 320 : 360,
+    64 + frets.length * 54
+  );
   const guideToneNotes = [thirdNote, seventhNote].filter(Boolean);
   const displayedRootNote = formatNoteForKey(rootNote, keyRoot);
   const displayedTargetNotes = targetNotes.map((note) =>
@@ -650,10 +673,10 @@ export function FretboardMap({
       <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-black uppercase text-[#64748B]">
-            Fretboard Map
+            {instrumentMode === "bass" ? "Bass Fretboard" : "Fretboard Map"}
           </p>
           <h4 className="mt-1 max-w-full break-words text-lg font-black text-[#E5E7EB] md:text-xl">
-            {keyRoot} major / {currentChordSymbol}
+            {instrumentMode === "bass" ? "4-string" : "6-string"} / {keyRoot} major / {currentChordSymbol}
           </h4>
           {mode === "solo" && (
             <p className="mt-1 break-words text-xs font-bold text-[#94A3B8]">
@@ -715,6 +738,7 @@ export function FretboardMap({
             getOpenLaneStyle={getOpenLaneStyle}
             getOpenDotStyle={getOpenDotStyle}
             getOpenAriaLabel={getOpenAriaLabel}
+            instrumentMode={instrumentMode}
           />
 
           {mode !== "solo" && (
