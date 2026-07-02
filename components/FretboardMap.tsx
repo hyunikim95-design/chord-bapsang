@@ -329,6 +329,19 @@ export function FretGrid({
     return "h-0 w-0";
   }
 
+  function getStringLineClass(stringIndex: number) {
+    if (instrumentMode === "bass") {
+      if (stringIndex === 0) return "h-[3px] bg-slate-200/65 shadow-[0_0_6px_rgba(226,232,240,0.22)]";
+      if (stringIndex === 1) return "h-[2px] bg-slate-200/58 shadow-[0_0_5px_rgba(226,232,240,0.18)]";
+      if (stringIndex === 2) return "h-[2px] bg-slate-300/48";
+      return "h-px bg-slate-300/42";
+    }
+
+    if (stringIndex <= 1) return "h-[2px] bg-slate-200/58 shadow-[0_0_5px_rgba(226,232,240,0.18)]";
+    if (stringIndex <= 3) return "h-px bg-slate-300/48";
+    return "h-px bg-slate-300/38";
+  }
+
   return (
     <div className="rounded-xl border border-blue-900/30 bg-gradient-to-br from-[#07111F] via-[#050B16] to-[#02040A] p-2 shadow-inner shadow-black/40">
       <div
@@ -339,7 +352,7 @@ export function FretGrid({
         {frets.map((fret) => (
           <span
             key={`fret-label-${fret}`}
-            className="border-l border-blue-900/30 py-1"
+            className="border-l border-blue-950/25 py-1"
           >
             {fret}
           </span>
@@ -353,7 +366,7 @@ export function FretGrid({
           return (
             <div
               key={`${mode}-${stringNote}-${stringIndex}`}
-              className="grid min-w-0 gap-0 border-b border-blue-950/35 last:border-b-0"
+              className="grid min-w-0 gap-0 border-b border-blue-950/20 last:border-b-0"
               style={{ gridTemplateColumns }}
             >
               <FretboardStringLane
@@ -383,15 +396,19 @@ export function FretGrid({
                 return (
                   <div
                     key={`${stringIndex}-${fret}`}
-                    className={`relative flex h-10 items-center justify-center border-l border-blue-900/35 bg-[#02040A]/35 ${
-                      isFirstFret ? "border-l-2 border-l-blue-800/60" : ""
-                    } ${isLastFret ? "border-r border-r-blue-900/35" : ""}`}
+                    className={`relative flex h-10 items-center justify-center border-l border-blue-950/25 bg-[#02040A]/25 ${
+                      isFirstFret ? "border-l-2 border-l-blue-900/45" : ""
+                    } ${isLastFret ? "border-r border-r-blue-950/25" : ""}`}
                     title={`${getGuitarStringNumber(
                       stringIndex,
                       instrumentMode
                     )} string ${fret} fret: ${note}`}
                   >
-                    <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-slate-500/35" />
+                    <span
+                      className={`absolute inset-x-0 top-1/2 -translate-y-1/2 ${getStringLineClass(
+                        stringIndex
+                      )}`}
+                    />
                     {!isInactive && (
                       <span
                         className={`relative z-10 flex shrink-0 items-center justify-center rounded-full border font-black leading-none ${getNoteDotClass(
