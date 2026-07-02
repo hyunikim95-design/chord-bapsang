@@ -352,7 +352,7 @@ export function FretGrid({
         {frets.map((fret) => (
           <span
             key={`fret-label-${fret}`}
-            className="border-l border-blue-950/25 py-1"
+            className="border-l border-slate-500/32 py-1 text-slate-400/85"
           >
             {fret}
           </span>
@@ -396,14 +396,19 @@ export function FretGrid({
                 return (
                   <div
                     key={`${stringIndex}-${fret}`}
-                    className={`relative flex h-10 items-center justify-center border-l border-blue-950/25 bg-[#02040A]/25 ${
-                      isFirstFret ? "border-l-2 border-l-blue-900/45" : ""
-                    } ${isLastFret ? "border-r border-r-blue-950/25" : ""}`}
+                    className={`relative flex h-10 items-center justify-center border-l border-slate-500/28 bg-[#02040A]/25 ${
+                      isFirstFret ? "border-l-2 border-l-slate-400/45" : ""
+                    } ${isLastFret ? "border-r border-r-slate-500/28" : ""}`}
                     title={`${getGuitarStringNumber(
                       stringIndex,
                       instrumentMode
                     )} string ${fret} fret: ${note}`}
                   >
+                    <span
+                      className={`absolute inset-y-1 left-0 w-px bg-gradient-to-b from-transparent via-slate-300/42 to-transparent ${
+                        isFirstFret ? "via-slate-200/55" : ""
+                      }`}
+                    />
                     <span
                       className={`absolute inset-x-0 top-1/2 -translate-y-1/2 ${getStringLineClass(
                         stringIndex
