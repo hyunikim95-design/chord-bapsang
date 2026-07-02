@@ -260,7 +260,7 @@ export function FretboardStringLane({
 
   return (
     <div
-      className={`flex h-8 min-w-0 items-center justify-between gap-1.5 rounded-md border px-1.5 text-xs font-black ${getOpenLaneStyle(
+      className={`flex h-10 min-w-0 items-center justify-between gap-1.5 border-r border-blue-900/40 px-1.5 text-xs font-black ${getOpenLaneStyle(
         openRole
       )}`}
       title={ariaLabel}
@@ -316,35 +316,44 @@ export function FretGrid({
   getOpenAriaLabel: GetOpenAriaLabel;
   instrumentMode: InstrumentMode;
 }) {
-  const gridTemplateColumns = `64px repeat(${frets.length}, minmax(44px, 1fr))`;
+  const gridTemplateColumns = `64px repeat(${frets.length}, minmax(52px, 1fr))`;
   const tuningNotes = getTuningNotes(instrumentMode);
   const displayStringIndexes = getDisplayStringIndexes(instrumentMode);
 
+  function getNoteDotClass(role: FretRole) {
+    if (role === "root") return "h-8 w-8 text-sm";
+    if (role === "target" || role === "resolve") return "h-7 w-7 text-xs";
+    if (role === "third" || role === "seventh") return "h-6 w-6 text-[11px]";
+    if (role === "chord") return "h-6 w-6 text-[11px]";
+    if (role === "scale") return "h-5 w-5 text-[10px] opacity-80";
+    return "h-0 w-0";
+  }
+
   return (
-    <>
+    <div className="rounded-xl border border-blue-900/30 bg-gradient-to-br from-[#07111F] via-[#050B16] to-[#02040A] p-2 shadow-inner shadow-black/40">
       <div
-        className="grid min-w-0 gap-1.5 text-center text-xs font-black text-[#64748B]"
+        className="grid min-w-0 gap-0 text-center text-xs font-black text-[#64748B]"
         style={{ gridTemplateColumns }}
       >
-        <span />
+        <span className="px-1 py-1 text-left">String</span>
         {frets.map((fret) => (
           <span
             key={`fret-label-${fret}`}
-            className="rounded-md border border-blue-950/35 bg-[#07111F] py-1.5"
+            className="border-l border-blue-900/30 py-1"
           >
             {fret}
           </span>
         ))}
       </div>
 
-      <div className="mt-1.5 min-w-0 space-y-1.5">
+      <div className="mt-1.5 min-w-0 overflow-hidden rounded-lg border border-blue-950/40">
         {displayStringIndexes.map((stringIndex) => {
           const stringNote = tuningNotes[stringIndex] ?? "E";
 
           return (
             <div
               key={`${mode}-${stringNote}-${stringIndex}`}
-              className="grid min-w-0 gap-1.5"
+              className="grid min-w-0 gap-0 border-b border-blue-950/35 last:border-b-0"
               style={{ gridTemplateColumns }}
             >
               <FretboardStringLane
@@ -367,20 +376,32 @@ export function FretGrid({
                 );
                 const role = getFretRole(note);
                 const style = getRoleStyle(role);
+                const isInactive = role === "inactive";
+                const isFirstFret = fret === frets[0];
+                const isLastFret = fret === frets[frets.length - 1];
 
                 return (
                   <div
                     key={`${stringIndex}-${fret}`}
-                    className="flex h-8 items-center justify-center rounded-md border text-xs font-black"
-                    style={style}
+                    className={`relative flex h-10 items-center justify-center border-l border-blue-900/35 bg-[#02040A]/35 ${
+                      isFirstFret ? "border-l-2 border-l-blue-800/60" : ""
+                    } ${isLastFret ? "border-r border-r-blue-900/35" : ""}`}
                     title={`${getGuitarStringNumber(
                       stringIndex,
                       instrumentMode
                     )} string ${fret} fret: ${note}`}
                   >
-                    <span className="leading-none">
-                      {getRoleLabel(role, note)}
-                    </span>
+                    <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-slate-500/35" />
+                    {!isInactive && (
+                      <span
+                        className={`relative z-10 flex shrink-0 items-center justify-center rounded-full border font-black leading-none ${getNoteDotClass(
+                          role
+                        )}`}
+                        style={style}
+                      >
+                        {getRoleLabel(role, note)}
+                      </span>
+                    )}
                   </div>
                 );
               })}
@@ -388,7 +409,7 @@ export function FretGrid({
           );
         })}
       </div>
-    </>
+    </div>
   );
 }
 
